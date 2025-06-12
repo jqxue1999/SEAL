@@ -21,6 +21,9 @@ dotnet/examples/SEALNetExamples.csproj
 CMakeSettings.json
 .vscode
 
+# Local libraries
+seallibs/
+
 # WebAssembly Output
 seal_wasm.js
 seal_wasm.wasm
