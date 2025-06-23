@@ -17,9 +17,19 @@
 #include <vector>
 #include <sys/resource.h>
 #include <iomanip>
+#include "seal/decryptor.h"
+#include "seal/valcheck.h"
+#include "seal/util/common.h"
+#include "seal/util/polyarithsmallmod.h"
+#include "seal/util/polycore.h"
+#include "seal/util/scalingvariant.h"
+#include "seal/util/uintarith.h"
+#include "seal/util/uintcore.h"
 
 using namespace std;
 using namespace seal;
+using namespace seal::util;
+
 
 void print_first_k_elements(const vector<uint64_t>& vec, size_t k);
 void example_batch_single_multiply();

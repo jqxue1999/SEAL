@@ -102,7 +102,7 @@ void example_batch_single_multiply()
 
 
     // =============================== Multiply the encrypted_vector_a_coeff with a scalar on the coefficient ===============================
-    uint64_t scalar =  5;    
+    uint64_t scalar = 5;
     MemoryPoolHandle pool = MemoryManager::GetPool();
     auto start2 = chrono::high_resolution_clock::now();
     util::negacyclic_multiply_poly_mono_coeffmod(
@@ -125,14 +125,29 @@ void example_batch_single_multiply()
     // =============================== Multiply the encrypted_vector_a_coeff with a scalar on the coefficient ===============================
 
     cout << "-------------------------------- Multiply the encrypted_vector_a_coeff with a vector of scalars on the coefficient --------------------------------\n";
-    cout << "scalar: " << scalar << endl;
+
     encryptor.encrypt(plain_vector_a_coeff, encrypted_vector_a_coeff);
     cout << "original plaintext polynomial: " << plain_vector_a_coeff.to_string() << endl;
+
+    cout << "encrypted_vector_a_coeff.is_ntt_form(): " << encrypted_vector_a_coeff.is_ntt_form() << endl;
+    evaluator.transform_to_ntt_inplace(encrypted_vector_a_coeff);
+    cout << "encrypted_vector_a_coeff.is_ntt_form(): " << encrypted_vector_a_coeff.is_ntt_form() << endl;
 
     auto &context_data = *context.key_context_data();
     auto coeff_modulus = context_data.parms().coeff_modulus();
     size_t N = poly_modulus_degree * encrypted_vector_a_coeff.coeff_modulus_size();
-    std::vector<uint64_t> scale_vector(N, scalar);
+    vector<uint64_t> scalar_vector(N, 0ULL);
+    
+    // ----------------------------- test for different values -----------------------------
+
+    // Initialize scalar_vector with different values for each coefficient but same value across RNS layers
+    for (size_t i = 0; i < poly_modulus_degree; i++) {
+        for (size_t j = 0; j < encrypted_vector_a_coeff.coeff_modulus_size(); j++) {
+            scalar_vector[i + j * poly_modulus_degree] = i;
+        }
+    }
+
+    // --------------------------------------------------------------------------------------------
 
     auto total_start = chrono::high_resolution_clock::now();
     chrono::microseconds total_mul_time(0);
@@ -141,14 +156,14 @@ void example_batch_single_multiply()
     // Process each polynomial in the ciphertext
     for (int i = 0; i < encrypted_vector_a_coeff.size(); i++) {
         uint64_t* coeffs = encrypted_vector_a_coeff.data(i);
-        std::vector<uint64_t> temp(N);
+        vector<uint64_t> temp(N);
         
         // Time the multiplication operation
         auto mul_start = chrono::high_resolution_clock::now();
         // Perform element-wise multiplication across all RNS layers
         transform(
             coeffs, coeffs + N,
-            scale_vector.begin(),
+            scalar_vector.begin(),
             temp.begin(),
             [](uint64_t a, uint64_t b) { return a * b; }
         );
@@ -180,6 +195,7 @@ void example_batch_single_multiply()
     cout << "Total modulo time: " << total_mod_time.count() << " microseconds" << endl;
     cout << "Total time: " << total_duration.count() << " microseconds" << endl;
 
+    evaluator.transform_from_ntt_inplace(encrypted_vector_a_coeff);
     decryptor.decrypt(encrypted_vector_a_coeff, plain_vector_a_coeff);
     cout << "decrypted plaintext polynomial: " << plain_vector_a_coeff.to_string() << endl;
 }
