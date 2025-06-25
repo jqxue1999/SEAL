@@ -45,7 +45,6 @@ if(SEAL_BUILD_EXAMPLES)
     target_sources(test_cpmm
         PRIVATE
             ${CMAKE_CURRENT_LIST_DIR}/cpmm.cpp
-            ${CMAKE_CURRENT_LIST_DIR}/test_cpmm.cpp
             ${CMAKE_CURRENT_LIST_DIR}/utils.cpp
     )
 
