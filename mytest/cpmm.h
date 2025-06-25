@@ -12,6 +12,8 @@
 #include <cstdint>
 #include <iostream>
 #include <algorithm>
+#include <cblas.h>
+#include <cassert>
 
 using namespace seal;
 using namespace std;
@@ -58,6 +60,14 @@ void extract_coefficients_from_ciphertext_vector(
  * @param modulus_vector 每个RNS层的模数
  */
 void matrix_multiply_for_all_rns_layers(
+    const vector<vector<uint64_t>>& plain_matrix,
+    const vector<vector<vector<uint64_t>>>& coeff_matrix_a,
+    const vector<vector<vector<uint64_t>>>& coeff_matrix_b,
+    vector<vector<vector<uint64_t>>>& result_a_matrix,
+    vector<vector<vector<uint64_t>>>& result_b_matrix,
+    const vector<uint64_t>& modulus_vector);
+
+void matrix_multiply_for_all_rns_layers_blas(
     const vector<vector<uint64_t>>& plain_matrix,
     const vector<vector<vector<uint64_t>>>& coeff_matrix_a,
     const vector<vector<vector<uint64_t>>>& coeff_matrix_b,
@@ -143,5 +153,11 @@ void matrix_multiply_plain(
     const vector<vector<uint64_t>>& B,
     vector<vector<uint64_t>>& C,
     uint64_t modulus = 0);
+
+void matrix_multiply_plain_blas(
+    const vector<vector<uint64_t>>& A,
+    const vector<vector<uint64_t>>& B,
+    vector<vector<uint64_t>>& C,
+    uint64_t modulus);
 
 #endif // CPMM_H

@@ -7,6 +7,9 @@ project(SEALExamples VERSION 4.1.2 LANGUAGES CXX)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+# Find BLAS library
+find_package(BLAS REQUIRED)
+
 # If not called from root CMakeLists.txt
 if(NOT DEFINED SEAL_BUILD_EXAMPLES)
     set(SEAL_BUILD_EXAMPLES ON)
@@ -52,5 +55,12 @@ if(SEAL_BUILD_EXAMPLES)
         target_link_libraries(test_cpmm PRIVATE SEAL::seal_shared)
     else()
         message(FATAL_ERROR "Cannot find target SEAL::seal or SEAL::seal_shared")
+    endif()
+
+    if(BLAS_FOUND)
+        target_link_libraries(test_cpmm PRIVATE ${BLAS_LIBRARIES})
+        if (BLAS_INCLUDE_DIRS)
+            target_include_directories(test_cpmm PRIVATE ${BLAS_INCLUDE_DIRS})
+        endif()
     endif()
 endif()

@@ -10,12 +10,22 @@ using namespace std;
 int main() {
     try {
         // 设置加密参数
-        EncryptionParameters parms(scheme_type::bfv);
+        scheme_type scheme = scheme_type::bfv;
+        EncryptionParameters parms(scheme);
         size_t poly_modulus_degree = 4096;
         parms.set_poly_modulus_degree(poly_modulus_degree);
         parms.set_coeff_modulus(CoeffModulus::BFVDefault(poly_modulus_degree));
-        parms.set_plain_modulus(PlainModulus::Batching(poly_modulus_degree, 20));
+
+        uint64_t plain_modulus_value = 1;
+        if (scheme == scheme_type::ckks) {
+            for (const auto &mod : parms.coeff_modulus())
+                plain_modulus_value *= mod.value();
+        } else {
+            parms.set_plain_modulus(PlainModulus::Batching(poly_modulus_degree, 20));
+            plain_modulus_value = parms.plain_modulus().value();            
+        }
         
+
         SEALContext context(parms);
         print_parameters(context);
         
@@ -87,13 +97,10 @@ int main() {
         // 验证结果
         cout << "\n=== 验证结果 ===" << endl;
         
-        // 获取明文模数
-        uint64_t plain_modulus_value = parms.plain_modulus().value();
-        cout << "明文模数: " << plain_modulus_value << endl;
-        
         // 计算期望结果（明文计算）
         vector<vector<uint64_t>> expected_result;
-        matrix_multiply_plain(plain_matrix_1, plain_matrix_2, expected_result, plain_modulus_value);
+        // matrix_multiply_plain(plain_matrix_1, plain_matrix_2, expected_result, plain_modulus_value);
+        matrix_multiply_plain_blas(plain_matrix_1, plain_matrix_2, expected_result, plain_modulus_value);
         
         print_matrix(expected_result, "期望结果矩阵");
         
