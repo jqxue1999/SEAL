@@ -1,12 +1,16 @@
 #include "cpmm.h"
-
+#include <flint/flint.h>
+#include <flint/fmpz.h>
+#include <flint/fmpz_mat.h>
+#include <flint/fmpz_mod.h>
+#include <flint/fmpz_mod_mat.h>
 
 using namespace seal;
 using namespace std;
 
 bool ciphertext_plaintext_matrix_multiply(
     const SEALContext& context,
-        const vector<vector<uint64_t>>& plain_matrix,
+    const vector<vector<uint64_t>>& plain_matrix,
     const vector<Ciphertext>& encrypted_matrix,
     vector<Ciphertext>& result_matrix)
 {
@@ -62,15 +66,24 @@ bool ciphertext_plaintext_matrix_multiply(
         vector<uint64_t> modulus_vector;
         extract_coefficients_from_ciphertext_vector(context, encrypted_matrix, coeff_matrix_a, coeff_matrix_b, modulus_vector);
         
-        cout << "\n步骤2/3: 执行矩阵乘法..." << endl;
+        cout << "\n\n步骤2/3: 执行矩阵乘法..." << endl;
         // 步骤1: 对每个RNS片，计算plaintext matrix * a和plaintext matrix * b
         vector<vector<vector<uint64_t>>> result_a_matrix, result_b_matrix;
-        // matrix_multiply_for_all_rns_layers(plain_matrix, coeff_matrix_a, coeff_matrix_b, result_a_matrix, result_b_matrix, modulus_vector);
-        matrix_multiply_for_all_rns_layers_blas(plain_matrix, coeff_matrix_a, coeff_matrix_b, result_a_matrix, result_b_matrix, modulus_vector);
+        
+        // cout << "处理a矩阵..." << endl;
+        // Normal_RNS_multiply(plain_matrix, coeff_matrix_a, result_a_matrix, modulus_vector);
+        // cout << "处理b矩阵..." << endl;
+        // Normal_RNS_multiply(plain_matrix, coeff_matrix_b, result_b_matrix, modulus_vector);
 
-        cout << "\n步骤3/3: 构建密文..." << endl;
+        // 可选：使用FLINT版本进行大整数矩阵运算
+        cout << "处理a矩阵（FLINT版本）..." << endl;
+        Normal_RNS_multiply_flint(plain_matrix, coeff_matrix_a, result_a_matrix, modulus_vector);
+        cout << "处理b矩阵（FLINT版本）..." << endl;
+        Normal_RNS_multiply_flint(plain_matrix, coeff_matrix_b, result_b_matrix, modulus_vector);
+
+        cout << "\n\n步骤3/3: 构建密文..." << endl;
         // 步骤2: 构建d个ciphertext，按行构建
-        build_ciphertexts_from_result_matrices(context, result_a_matrix, result_b_matrix, result_matrix);
+        build_ciphertexts_from_result_matrices_2(context, result_a_matrix, result_b_matrix, result_matrix);
         
         cout << "\n=== 密文-明文矩阵乘法完成 ===" << endl;
         
@@ -161,119 +174,31 @@ void extract_coefficients_from_ciphertext_vector(
         cout << "\r提取系数进度: RNS层 " << (rns_layer + 1) << "/" << coeff_modulus_size 
              << " [" << (rns_layer + 1) * 100 / coeff_modulus_size << "%]" << flush;
     }
-    
-    cout << "\n系数提取完成！" << endl;
 }
 
-void matrix_multiply_for_all_rns_layers(
+void Normal_RNS_multiply(
     const vector<vector<uint64_t>>& plain_matrix,
-    const vector<vector<vector<uint64_t>>>& coeff_matrix_a,
-    const vector<vector<vector<uint64_t>>>& coeff_matrix_b,
-    vector<vector<vector<uint64_t>>>& result_a_matrix,
-    vector<vector<vector<uint64_t>>>& result_b_matrix,
+    const vector<vector<vector<uint64_t>>>& coeff_matrix,
+    vector<vector<vector<uint64_t>>>& result_matrix,
     const vector<uint64_t>& modulus_vector)
 {
-    if (plain_matrix.empty() || coeff_matrix_a.empty() || coeff_matrix_b.empty()) {
+    if (plain_matrix.empty() || coeff_matrix.empty()) {
         cerr << "Empty matrices in multiplication" << endl;
         return;
     }
-    
+
     size_t plain_rows = plain_matrix.size();
     size_t plain_cols = plain_matrix[0].size();
-    size_t rns_layers = coeff_matrix_a.size();
-    
-    if (coeff_matrix_b.size() != rns_layers) {
-        cerr << "RNS layer count mismatch" << endl;
-        return;
-    }
-    
+    size_t rns_layers = coeff_matrix.size();
+
     if (modulus_vector.size() != rns_layers) {
-        cerr << "Modulus vector size mismatch" << endl;
-        return;
-    }
-    
-    cout << "开始矩阵乘法计算..." << endl;
-    cout << "RNS层数: " << rns_layers << ", 矩阵大小: " << plain_rows << "x" << plain_cols << endl;
-    
-    // 初始化结果矩阵 - 每个RNS层一个d×d矩阵
-    result_a_matrix.resize(rns_layers);
-    result_b_matrix.resize(rns_layers);
-    
-    for (size_t rns_layer = 0; rns_layer < rns_layers; rns_layer++) {
-        // 显示RNS层进度
-        cout << "\r处理RNS层: " << (rns_layer + 1) << "/" << rns_layers 
-             << " [" << (rns_layer + 1) * 100 / rns_layers << "%]" << flush;
-        
-        result_a_matrix[rns_layer].resize(plain_rows);
-        result_b_matrix[rns_layer].resize(plain_rows);
-        
-        for (size_t i = 0; i < plain_rows; i++) {
-            result_a_matrix[rns_layer][i].resize(plain_cols, 0);
-            result_b_matrix[rns_layer][i].resize(plain_cols, 0);
-        }
-        
-        uint64_t modulus = modulus_vector[rns_layer];
-        
-        // 对当前RNS层执行矩阵乘法：plain_matrix * coeff_matrix_a[rns_layer] 和 plain_matrix * coeff_matrix_b[rns_layer]
-        for (size_t i = 0; i < plain_rows; i++) {
-            // 显示当前处理的行
-            cout << "\rRNS层 " << (rns_layer + 1) << "/" << rns_layers 
-                 << " - 处理第 " << (i + 1) << "/" << plain_rows << " 行" << flush;
-            
-            for (size_t j = 0; j < plain_cols; j++) {
-                uint64_t sum_a = 0;
-                uint64_t sum_b = 0;
-                
-                for (size_t k = 0; k < plain_cols; k++) {
-                    // 对明文矩阵的值也需要进行模运算
-                    uint64_t plain_val = plain_matrix[i][k];
-                    uint64_t coeff_a_val = coeff_matrix_a[rns_layer][k][j];
-                    uint64_t coeff_b_val = coeff_matrix_b[rns_layer][k][j];
-                    
-                    // 计算乘积并累加，使用模运算避免溢出
-                    uint64_t product_a = plain_val * coeff_a_val;
-                    uint64_t product_b = plain_val * coeff_b_val;
-                    
-                    sum_a = (sum_a + product_a) % modulus;
-                    sum_b = (sum_b + product_b) % modulus;
-                }
-                
-                result_a_matrix[rns_layer][i][j] = sum_a;
-                result_b_matrix[rns_layer][i][j] = sum_b;
-            }
-        }
-    }
-    
-    cout << "\n矩阵乘法计算完成！" << endl;
-}
-
-void matrix_multiply_for_all_rns_layers_blas(
-    const vector<vector<uint64_t>>& plain_matrix,
-    const vector<vector<vector<uint64_t>>>& coeff_matrix_a,
-    const vector<vector<vector<uint64_t>>>& coeff_matrix_b,
-    vector<vector<vector<uint64_t>>>& result_a_matrix,
-    vector<vector<vector<uint64_t>>>& result_b_matrix,
-    const vector<uint64_t>& modulus_vector)
-{
-    if (plain_matrix.empty() || coeff_matrix_a.empty() || coeff_matrix_b.empty()) {
-        cerr << "Empty matrices in multiplication" << endl;
-        return;
-    }
-
-    size_t plain_rows = plain_matrix.size();
-    size_t plain_cols = plain_matrix[0].size();
-    size_t rns_layers = coeff_matrix_a.size();
-
-    if (coeff_matrix_b.size() != rns_layers || modulus_vector.size() != rns_layers) {
         cerr << "RNS layer count or modulus vector size mismatch" << endl;
         return;
     }
 
-    cout << "开始使用BLAS进行矩阵乘法计算..." << endl;
     cout << "RNS层数: " << rns_layers << ", 矩阵大小: " << plain_rows << "x" << plain_cols << endl;
 
-    result_a_matrix.resize(rns_layers);
-    result_b_matrix.resize(rns_layers);
+    result_matrix.resize(rns_layers);
 
     std::vector<double> plain_matrix_double(plain_rows * plain_cols);
     for(size_t i = 0; i < plain_rows; ++i) {
@@ -286,59 +211,35 @@ void matrix_multiply_for_all_rns_layers_blas(
         cout << "\r处理RNS层: " << (rns_layer + 1) << "/" << rns_layers 
              << " [" << (rns_layer + 1) * 100 / rns_layers << "%]" << flush;
 
-        result_a_matrix[rns_layer].resize(plain_rows, vector<uint64_t>(plain_cols));
-        result_b_matrix[rns_layer].resize(plain_rows, vector<uint64_t>(plain_cols));
+        result_matrix[rns_layer].resize(plain_rows, vector<uint64_t>(plain_cols));
 
-        size_t matrix_a_rows = coeff_matrix_a[rns_layer].size();
-        size_t matrix_a_cols = coeff_matrix_a[rns_layer][0].size();
-        std::vector<double> coeff_a_double(matrix_a_rows * matrix_a_cols);
-        for(size_t i = 0; i < matrix_a_rows; ++i) {
-            for (size_t j = 0; j < matrix_a_cols; ++j) {
-                coeff_a_double[i * matrix_a_cols + j] = static_cast<double>(coeff_matrix_a[rns_layer][i][j]);
-            }
-        }
-        
-        size_t matrix_b_rows = coeff_matrix_b[rns_layer].size();
-        size_t matrix_b_cols = coeff_matrix_b[rns_layer][0].size();
-        std::vector<double> coeff_b_double(matrix_b_rows * matrix_b_cols);
-        for(size_t i = 0; i < matrix_b_rows; ++i) {
-            for (size_t j = 0; j < matrix_b_cols; ++j) {
-                coeff_b_double[i * matrix_b_cols + j] = static_cast<double>(coeff_matrix_b[rns_layer][i][j]);
+        size_t matrix_rows = coeff_matrix[rns_layer].size();
+        size_t matrix_cols = coeff_matrix[rns_layer][0].size();
+        std::vector<double> coeff_double(matrix_rows * matrix_cols);
+        for(size_t i = 0; i < matrix_rows; ++i) {
+            for (size_t j = 0; j < matrix_cols; ++j) {
+                coeff_double[i * matrix_cols + j] = static_cast<double>(coeff_matrix[rns_layer][i][j]);
             }
         }
 
-        std::vector<double> result_a_double(plain_rows * matrix_a_cols);
-        std::vector<double> result_b_double(plain_rows * matrix_b_cols);
+        std::vector<double> result_double(plain_rows * matrix_cols);
 
         cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
-                    plain_rows, matrix_a_cols, plain_cols, 1.0,
+                    plain_rows, matrix_cols, plain_cols, 1.0,
                     plain_matrix_double.data(), plain_cols,
-                    coeff_a_double.data(), matrix_a_cols, 0.0,
-                    result_a_double.data(), matrix_a_cols);
-
-        cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
-                    plain_rows, matrix_b_cols, plain_cols, 1.0,
-                    plain_matrix_double.data(), plain_cols,
-                    coeff_b_double.data(), matrix_b_cols, 0.0,
-                    result_b_double.data(), matrix_b_cols);
+                    coeff_double.data(), matrix_cols, 0.0,
+                    result_double.data(), matrix_cols);
         
         uint64_t modulus = modulus_vector[rns_layer];
         for(size_t i = 0; i < plain_rows; ++i) {
-            for(size_t j = 0; j < matrix_a_cols; ++j) {
-                result_a_matrix[rns_layer][i][j] = static_cast<uint64_t>(fmod(result_a_double[i * matrix_a_cols + j], modulus));
-            }
-        }
-        for(size_t i = 0; i < plain_rows; ++i) {
-            for(size_t j = 0; j < matrix_b_cols; ++j) {
-                result_b_matrix[rns_layer][i][j] = static_cast<uint64_t>(fmod(result_b_double[i * matrix_b_cols + j], modulus));
+            for(size_t j = 0; j < matrix_cols; ++j) {
+                result_matrix[rns_layer][i][j] = static_cast<uint64_t>(fmod(result_double[i * matrix_cols + j], modulus));
             }
         }
     }
-
-    cout << "\nBLAS矩阵乘法计算完成！" << endl;
 }
 
-void build_ciphertexts_from_result_matrices(
+void build_ciphertexts_from_result_matrices_2(
     const SEALContext& context,
     const vector<vector<vector<uint64_t>>>& result_a_matrix,
     const vector<vector<vector<uint64_t>>>& result_b_matrix,
@@ -403,19 +304,19 @@ void build_ciphertexts_from_result_matrices(
     cout << "\n密文构建完成！" << endl;
 }
 
-// 将矩阵行编码到明文多项式系数上的函数
-void encode_matrix_row_to_plaintext(
-    const vector<uint64_t>& matrix_row,
+// 将向量编码到明文多项式系数上的函数
+void encode_vector_to_plaintext(
+    const vector<uint64_t>& vector_data,
     const SEALContext& context,
     Plaintext& plaintext)
 {
     auto context_data = context.get_context_data(context.first_parms_id());
     size_t poly_modulus_degree = context_data->parms().poly_modulus_degree();
     
-    // 检查行大小
-    if (matrix_row.size() != poly_modulus_degree) {
-        cerr << "Matrix row size must be " << poly_modulus_degree 
-             << ", but got " << matrix_row.size() << endl;
+    // 检查向量大小
+    if (vector_data.size() != poly_modulus_degree) {
+        cerr << "Vector size must be " << poly_modulus_degree 
+             << ", but got " << vector_data.size() << endl;
         return;
     }
     
@@ -427,9 +328,9 @@ void encode_matrix_row_to_plaintext(
     
     plaintext.set_zero();
     
-    // 使用 modulo_poly_coeffs 将矩阵行编码到多项式系数上
+    // 使用 modulo_poly_coeffs 将向量编码到多项式系数上
     util::modulo_poly_coeffs(
-        matrix_row.data(), 
+        vector_data.data(), 
         poly_modulus_degree, 
         (context_data->parms().scheme() == scheme_type::ckks 
             ? context_data->parms().coeff_modulus()[0] 
@@ -439,67 +340,139 @@ void encode_matrix_row_to_plaintext(
     if (context_data->parms().scheme() == scheme_type::ckks) {
         util::ntt_negacyclic_harvey(plaintext.data(), context_data->small_ntt_tables()[0]);
         plaintext.parms_id() = context.key_parms_id();
-        // assert(plaintext.parms_id() == context.key_parms_id());
     }
 }
 
-// 从明文多项式系数解码回矩阵行
-void decode_plaintext_to_matrix_row(
+// 从明文多项式系数解码回向量
+void decode_plaintext_to_vector(
     const Plaintext& plaintext,
     const SEALContext& context,
-    vector<uint64_t>& matrix_row)
+    vector<uint64_t>& vector_data)
 {
     auto context_data = context.get_context_data(context.first_parms_id());
     size_t poly_modulus_degree = context_data->parms().poly_modulus_degree();
     
-    matrix_row.resize(poly_modulus_degree);
+    vector_data.resize(poly_modulus_degree);
     
     // 直接复制系数
     for (size_t i = 0; i < poly_modulus_degree; i++) {
-        matrix_row[i] = plaintext.data()[i];
+        vector_data[i] = plaintext.data()[i];
     }
 }
 
-void encrypt_matrix_rows(
+void encrypt_matrix(
+    const bool is_row,
     const SEALContext& context,
     Encryptor& encryptor,
     const vector<vector<uint64_t>>& plain_matrix,
     vector<Ciphertext>& encrypted_matrix)
 {
-    size_t d = plain_matrix.size();
-    if (d == 0) {
+    if (plain_matrix.empty()) {
         cerr << "明文矩阵为空" << endl;
         return;
     }
+    
+    size_t rows = plain_matrix.size();
+    size_t cols = plain_matrix[0].size();
+    
     auto context_data = context.get_context_data(context.first_parms_id());
     size_t poly_modulus_degree = context_data->parms().poly_modulus_degree();
-    // 检查每行长度
-    for (size_t i = 0; i < d; i++) {
-        if (plain_matrix[i].size() != poly_modulus_degree) {
-            cerr << "明文矩阵第" << i << "行长度错误，应为" << poly_modulus_degree << endl;
+    
+    if (is_row) {
+        // 按行编码
+        // 检查每行长度
+        for (size_t i = 0; i < rows; i++) {
+            if (plain_matrix[i].size() != poly_modulus_degree) {
+                cerr << "明文矩阵第" << i << "行长度错误，应为" << poly_modulus_degree << endl;
+                return;
+            }
+        }
+        encrypted_matrix.resize(rows);
+        for (size_t i = 0; i < rows; i++) {
+            Plaintext plaintext;
+            encode_vector_to_plaintext(plain_matrix[i], context, plaintext);
+            encryptor.encrypt(plaintext, encrypted_matrix[i]);
+        }
+    } else {
+        // 按列编码
+        // 检查矩阵维度
+        if (rows != poly_modulus_degree) {
+            cerr << "明文矩阵行数错误，应为" << poly_modulus_degree << "，实际为" << rows << endl;
             return;
         }
-    }
-    encrypted_matrix.resize(d);
-    for (size_t i = 0; i < d; i++) {
-        Plaintext plaintext;
-        encode_matrix_row_to_plaintext(plain_matrix[i], context, plaintext);
-        encryptor.encrypt(plaintext, encrypted_matrix[i]);
+        
+        // 检查每行长度
+        for (size_t i = 0; i < rows; i++) {
+            if (plain_matrix[i].size() != cols) {
+                cerr << "明文矩阵第" << i << "行长度不一致" << endl;
+                return;
+            }
+        }
+        
+        encrypted_matrix.resize(cols);
+        
+        // 对每一列进行编码和加密
+        for (size_t j = 0; j < cols; j++) {
+            // 提取第j列
+            vector<uint64_t> matrix_col(rows);
+            for (size_t i = 0; i < rows; i++) {
+                matrix_col[i] = plain_matrix[i][j];
+            }
+            
+            // 编码并加密
+            Plaintext plaintext;
+            encode_vector_to_plaintext(matrix_col, context, plaintext);
+            encryptor.encrypt(plaintext, encrypted_matrix[j]);
+        }
     }
 }
 
 void decrypt_ciphertexts_to_matrix(
+    const bool is_row,
     const SEALContext& context,
     Decryptor& decryptor,
     const vector<Ciphertext>& encrypted_matrix,
     vector<vector<uint64_t>>& plain_matrix)
 {
-    size_t d = encrypted_matrix.size();
-    plain_matrix.resize(d);
-    for (size_t i = 0; i < d; i++) {
-        Plaintext pt;
-        decryptor.decrypt(encrypted_matrix[i], pt);
-        decode_plaintext_to_matrix_row(pt, context, plain_matrix[i]);
+    if (encrypted_matrix.empty()) {
+        cerr << "密文矩阵为空" << endl;
+        return;
+    }
+    
+    auto context_data = context.get_context_data(context.first_parms_id());
+    size_t poly_modulus_degree = context_data->parms().poly_modulus_degree();
+    
+    if (is_row) {
+        // 按行解码
+        size_t d = encrypted_matrix.size();
+        plain_matrix.resize(d);
+        for (size_t i = 0; i < d; i++) {
+            Plaintext pt;
+            decryptor.decrypt(encrypted_matrix[i], pt);
+            decode_plaintext_to_vector(pt, context, plain_matrix[i]);
+        }
+    } else {
+        // 按列解码
+        size_t cols = encrypted_matrix.size();
+        
+        plain_matrix.resize(poly_modulus_degree);
+        for (size_t i = 0; i < poly_modulus_degree; i++) {
+            plain_matrix[i].resize(cols);
+        }
+        
+        // 对每个密文进行解密并提取对应的列
+        for (size_t j = 0; j < cols; j++) {
+            Plaintext pt;
+            decryptor.decrypt(encrypted_matrix[j], pt);
+            
+            vector<uint64_t> matrix_col;
+            decode_plaintext_to_vector(pt, context, matrix_col);
+            
+            // 将列数据填充到矩阵中
+            for (size_t i = 0; i < poly_modulus_degree; i++) {
+                plain_matrix[i][j] = matrix_col[i];
+            }
+        }
     }
 }
 
@@ -584,116 +557,215 @@ void matrix_multiply_plain_blas(
     }
 }
 
-
-int main() {
-    try {
-        // 设置加密参数
-        scheme_type scheme = scheme_type::bfv;
-        EncryptionParameters parms(scheme);
-        size_t poly_modulus_degree = 4096;
-        parms.set_poly_modulus_degree(poly_modulus_degree);
-        parms.set_coeff_modulus(CoeffModulus::BFVDefault(poly_modulus_degree));
-        // Double can only represent 2^53-1, so we need to carefully design a new coeff_modulus for degree 8192
-        // parms.set_coeff_modulus(CoeffModulus::Create(poly_modulus_degree, { 36, 36, 36, 36, 37 }));
-
-        uint64_t plain_modulus_value = 1;
-        if (scheme == scheme_type::ckks) {
-            for (const auto &mod : parms.coeff_modulus())
-                plain_modulus_value *= mod.value();
-        } else {
-            parms.set_plain_modulus(PlainModulus::Batching(poly_modulus_degree, 20));
-            plain_modulus_value = parms.plain_modulus().value();            
+void transpose_matrix_blas(
+    const vector<vector<vector<uint64_t>>>& input_matrix,
+    vector<vector<vector<uint64_t>>>& output_matrix)
+{
+    if (input_matrix.empty()) {
+        cerr << "Input matrix is empty" << endl;
+        return;
+    }
+    
+    size_t rns_layers = input_matrix.size();
+    size_t rows = input_matrix[0].size();
+    size_t cols = input_matrix[0][0].size();
+    
+    // 检查所有RNS层的矩阵大小是否一致
+    for (size_t rns = 0; rns < rns_layers; rns++) {
+        if (input_matrix[rns].size() != rows || input_matrix[rns][0].size() != cols) {
+            cerr << "Matrix dimensions are not consistent across RNS layers" << endl;
+            return;
         }
+    }
+    
+    output_matrix.resize(rns_layers);
+    
+    cout << "开始使用BLAS进行矩阵转置..." << endl;
+    cout << "RNS层数: " << rns_layers << ", 矩阵大小: " << rows << "x" << cols << endl;
+    
+    for (size_t rns = 0; rns < rns_layers; rns++) {
+        cout << "\r处理RNS层: " << (rns + 1) << "/" << rns_layers 
+             << " [" << (rns + 1) * 100 / rns_layers << "%]" << flush;
         
-
-        SEALContext context(parms);
-        print_parameters(context);
+        // 初始化输出矩阵
+        output_matrix[rns].resize(cols, vector<uint64_t>(rows));
         
-        // 生成密钥
-        KeyGenerator keygen(context);
-        SecretKey secret_key = keygen.secret_key();
-        PublicKey public_key;
-        keygen.create_public_key(public_key);
+        // 转换为double数组
+        vector<double> input_double(rows * cols);
+        vector<double> output_double(cols * rows);
         
-        Encryptor encryptor(context, public_key);
-        Decryptor decryptor(context, secret_key);
-        
-        size_t d = poly_modulus_degree;
-        cout << "\n=== 测试参数 ===" << endl;
-        cout << "多项式模数次数: " << d << endl;
-        cout << "系数模数层数: " << parms.coeff_modulus().size() << endl;
-        
-        // 创建测试矩阵
-        cout << "\n=== 创建测试矩阵 ===" << endl;
-        
-        // 创建1×d的密文矩阵（每个密文编码一个矩阵行）
-        vector<Ciphertext> encrypted_matrix_2;
-        
-        // 创建d×d的明文矩阵
-        vector<vector<uint64_t>> plain_matrix_1(d, vector<uint64_t>(d));
-        vector<vector<uint64_t>> plain_matrix_2(d, vector<uint64_t>(d));
-        
-        // 初始化明文矩阵（简单的测试模式）
-        for (size_t i = 0; i < d; i++) {
-            for (size_t j = 0; j < d; j++) {
-                plain_matrix_1[i][j] = rand() % 10;
-                plain_matrix_2[i][j] = rand() % 10;
+        for (size_t i = 0; i < rows; i++) {
+            for (size_t j = 0; j < cols; j++) {
+                input_double[i * cols + j] = static_cast<double>(input_matrix[rns][i][j]);
             }
         }
         
-        // 创建并加密矩阵行
-        encrypt_matrix_rows(context, encryptor, plain_matrix_2, encrypted_matrix_2);
-
-        print_matrix(plain_matrix_1, "明文矩阵 1");
-        print_matrix(plain_matrix_2, "明文矩阵 2");
-        print_ciphertext_info(encrypted_matrix_2, "密文矩阵 2");
+        // 使用BLAS的domatcopy进行转置
+        // CblasRowMajor: 行主序
+        // CblasTrans: 转置操作
+        // rows, cols: 源矩阵的行数和列数
+        // 1.0: alpha值（缩放因子）
+        // input_double.data(), cols: 源矩阵数据，源矩阵的列数（步长）
+        // output_double.data(), rows: 目标矩阵数据，目标矩阵的列数（步长）
+        cblas_domatcopy(CblasRowMajor, CblasTrans, rows, cols, 1.0,
+                        input_double.data(), cols, output_double.data(), rows);
         
-        // 执行矩阵乘法
-        cout << "\n=== 执行密文-明文矩阵乘法 ===" << endl;
-        vector<Ciphertext> result_matrix;
-        
-        auto start_time = chrono::high_resolution_clock::now();
-        
-        bool success = ciphertext_plaintext_matrix_multiply(
-            context, plain_matrix_1, encrypted_matrix_2, result_matrix);
-        
-        auto end_time = chrono::high_resolution_clock::now();
-        auto duration = chrono::duration_cast<chrono::milliseconds>(end_time - start_time);
-        
-        if (!success) {
-            cerr << "矩阵乘法失败！" << endl;
-            return 1;
+        // 转换回uint64_t
+        for (size_t i = 0; i < cols; i++) {
+            for (size_t j = 0; j < rows; j++) {
+                output_matrix[rns][i][j] = static_cast<uint64_t>(output_double[i * rows + j]);
+            }
         }
-        
-        cout << "矩阵乘法完成，耗时: " << duration.count() << " ms" << endl;
-        print_ciphertext_info(result_matrix, "结果密文矩阵");
-        
-        // 验证结果
-        cout << "\n=== 验证结果 ===" << endl;
-        
-        // 计算期望结果（明文计算）
-        vector<vector<uint64_t>> expected_result;
-        // matrix_multiply_plain(plain_matrix_1, plain_matrix_2, expected_result, plain_modulus_value);
-        matrix_multiply_plain_blas(plain_matrix_1, plain_matrix_2, expected_result, plain_modulus_value);
-        
-        print_matrix(expected_result, "期望结果矩阵");
-        
-        // 解密并验证结果
-        cout << "\n解密结果验证:" << endl;
-        bool all_correct = true;
-
-        vector<vector<uint64_t>> decrypted_result_matrix;
-        decrypt_ciphertexts_to_matrix(context, decryptor, result_matrix, decrypted_result_matrix);
-        print_matrix(decrypted_result_matrix, "解密结果矩阵");
-        
-        check_matrix_equal(expected_result, decrypted_result_matrix);
-
-        cout << "\n=== 测试完成 ===" << endl;
-        
-    } catch (const exception& e) {
-        cerr << "错误: " << e.what() << endl;
-        return 1;
     }
     
-    return 0;
+    cout << "\nBLAS矩阵转置完成！" << endl;
+}
+
+void Normal_RNS_multiply_flint(
+    const vector<vector<uint64_t>>& plain_matrix,
+    const vector<vector<vector<uint64_t>>>& coeff_matrix,
+    vector<vector<vector<uint64_t>>>& result_matrix,
+    const vector<uint64_t>& modulus_vector)
+{
+    if (plain_matrix.empty() || coeff_matrix.empty()) {
+        cerr << "Empty matrices in multiplication" << endl;
+        return;
+    }
+
+    size_t plain_rows = plain_matrix.size();
+    size_t plain_cols = plain_matrix[0].size();
+    size_t rns_layers = coeff_matrix.size();
+
+    if (modulus_vector.size() != rns_layers) {
+        cerr << "RNS layer count or modulus vector size mismatch" << endl;
+        return;
+    }
+
+    cout << "RNS层数: " << rns_layers << ", 矩阵大小: " << plain_rows << "x" << plain_cols << endl;
+
+    result_matrix.resize(rns_layers);
+
+    for (size_t rns_layer = 0; rns_layer < rns_layers; rns_layer++) {
+        cout << "\r处理RNS层: " << (rns_layer + 1) << "/" << rns_layers 
+             << " [" << (rns_layer + 1) * 100 / rns_layers << "%]" << flush;
+
+        result_matrix[rns_layer].resize(plain_rows, vector<uint64_t>(plain_cols));
+
+        size_t matrix_rows = coeff_matrix[rns_layer].size();
+        size_t matrix_cols = coeff_matrix[rns_layer][0].size();
+
+        // 使用FLINT进行矩阵乘法
+        fmpz_t modulus;
+        fmpz_init_set_ui(modulus, modulus_vector[rns_layer]);
+        
+        fmpz_mod_mat_t plain_mat, coeff_mat, result;
+        fmpz_mod_mat_init(plain_mat, plain_rows, plain_cols, modulus);
+        fmpz_mod_mat_init(coeff_mat, matrix_rows, matrix_cols, modulus);
+        fmpz_mod_mat_init(result, plain_rows, matrix_cols, modulus);
+        
+        // 填充明文矩阵
+        for (size_t i = 0; i < plain_rows; i++) {
+            for (size_t j = 0; j < plain_cols; j++) {
+                fmpz_t val;
+                fmpz_init_set_ui(val, plain_matrix[i][j]);
+                fmpz_mod_mat_set_entry(plain_mat, i, j, val);
+                fmpz_clear(val);
+            }
+        }
+        
+        // 填充系数矩阵
+        for (size_t i = 0; i < matrix_rows; i++) {
+            for (size_t j = 0; j < matrix_cols; j++) {
+                fmpz_t val;
+                fmpz_init_set_ui(val, coeff_matrix[rns_layer][i][j]);
+                fmpz_mod_mat_set_entry(coeff_mat, i, j, val);
+                fmpz_clear(val);
+            }
+        }
+        
+        // 执行矩阵乘法
+        fmpz_mod_mat_mul(result, plain_mat, coeff_mat);
+        
+        // 提取结果
+        for (size_t i = 0; i < plain_rows; i++) {
+            for (size_t j = 0; j < matrix_cols; j++) {
+                fmpz_t val;
+                fmpz_init(val);
+                fmpz_mod_mat_get_entry(val, result, i, j);
+                result_matrix[rns_layer][i][j] = fmpz_get_ui(val);
+                fmpz_clear(val);
+            }
+        }
+        
+        // 清理FLINT对象
+        fmpz_mod_mat_clear(plain_mat);
+        fmpz_mod_mat_clear(coeff_mat);
+        fmpz_mod_mat_clear(result);
+        fmpz_clear(modulus);
+    }
+
+    cout << "\nFLINT Normal RNS矩阵乘法计算完成！" << endl;
+}
+
+void transpose_matrix_flint(
+    const vector<vector<vector<uint64_t>>>& input_matrix,
+    vector<vector<vector<uint64_t>>>& output_matrix)
+{
+    if (input_matrix.empty()) {
+        cerr << "Input matrix is empty" << endl;
+        return;
+    }
+    
+    size_t rns_layers = input_matrix.size();
+    size_t rows = input_matrix[0].size();
+    size_t cols = input_matrix[0][0].size();
+    
+    // 检查所有RNS层的矩阵大小是否一致
+    for (size_t rns = 0; rns < rns_layers; rns++) {
+        if (input_matrix[rns].size() != rows || input_matrix[rns][0].size() != cols) {
+            cerr << "Matrix dimensions are not consistent across RNS layers" << endl;
+            return;
+        }
+    }
+    
+    output_matrix.resize(rns_layers);
+    
+    cout << "开始使用FLINT进行矩阵转置..." << endl;
+    cout << "RNS层数: " << rns_layers << ", 矩阵大小: " << rows << "x" << cols << endl;
+    
+    for (size_t rns = 0; rns < rns_layers; rns++) {
+        cout << "\r处理RNS层: " << (rns + 1) << "/" << rns_layers 
+             << " [" << (rns + 1) * 100 / rns_layers << "%]" << flush;
+        
+        // 初始化输出矩阵
+        output_matrix[rns].resize(cols, vector<uint64_t>(rows));
+        
+        // 使用FLINT进行矩阵转置
+        fmpz_mat_t input_mat, output_mat;
+        fmpz_mat_init(input_mat, rows, cols);
+        fmpz_mat_init(output_mat, cols, rows);
+        
+        // 填充输入矩阵
+        for (size_t i = 0; i < rows; i++) {
+            for (size_t j = 0; j < cols; j++) {
+                fmpz_set_ui(fmpz_mat_entry(input_mat, i, j), input_matrix[rns][i][j]);
+            }
+        }
+        
+        // 执行转置
+        fmpz_mat_transpose(output_mat, input_mat);
+        
+        // 提取结果
+        for (size_t i = 0; i < cols; i++) {
+            for (size_t j = 0; j < rows; j++) {
+                output_matrix[rns][i][j] = fmpz_get_ui(fmpz_mat_entry(output_mat, i, j));
+            }
+        }
+        
+        // 清理FLINT对象
+        fmpz_mat_clear(input_mat);
+        fmpz_mat_clear(output_mat);
+    }
+    
+    cout << "\nFLINT矩阵转置完成！" << endl;
 }

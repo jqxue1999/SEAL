@@ -51,32 +51,6 @@ void extract_coefficients_from_ciphertext_vector(
     vector<uint64_t>& modulus_vector);
 
 /**
- * 对所有RNS层执行矩阵乘法
- * 
- * @param plain_matrix d×d明文矩阵
- * @param coeff_matrix_a a多项式系数矩阵 [RNS层][密文索引][多项式系数]
- * @param coeff_matrix_b b多项式系数矩阵 [RNS层][密文索引][多项式系数]
- * @param result_a_matrix 结果a矩阵 [RNS层][行][列]
- * @param result_b_matrix 结果b矩阵 [RNS层][行][列]
- * @param modulus_vector 每个RNS层的模数
- */
-void matrix_multiply_for_all_rns_layers(
-    const vector<vector<uint64_t>>& plain_matrix,
-    const vector<vector<vector<uint64_t>>>& coeff_matrix_a,
-    const vector<vector<vector<uint64_t>>>& coeff_matrix_b,
-    vector<vector<vector<uint64_t>>>& result_a_matrix,
-    vector<vector<vector<uint64_t>>>& result_b_matrix,
-    const vector<uint64_t>& modulus_vector);
-
-void matrix_multiply_for_all_rns_layers_blas(
-    const vector<vector<uint64_t>>& plain_matrix,
-    const vector<vector<vector<uint64_t>>>& coeff_matrix_a,
-    const vector<vector<vector<uint64_t>>>& coeff_matrix_b,
-    vector<vector<vector<uint64_t>>>& result_a_matrix,
-    vector<vector<vector<uint64_t>>>& result_b_matrix,
-    const vector<uint64_t>& modulus_vector);
-
-/**
  * 从结果矩阵构建密文向量
  * 
  * @param context SEAL上下文
@@ -84,59 +58,63 @@ void matrix_multiply_for_all_rns_layers_blas(
  * @param result_b_matrix 结果b矩阵 [RNS层][行][列]
  * @param result_matrix 输出的密文向量
  */
-void build_ciphertexts_from_result_matrices(
+void build_ciphertexts_from_result_matrices_2(
     const SEALContext& context,
     const vector<vector<vector<uint64_t>>>& result_a_matrix,
     const vector<vector<vector<uint64_t>>>& result_b_matrix,
     vector<Ciphertext>& result_matrix);
 
 /**
- * 将矩阵行编码到明文多项式系数上
+ * 将向量编码到明文多项式系数上
  * 
- * @param matrix_row 矩阵行
+ * @param vector_data 向量数据
  * @param context SEAL上下文
  * @param plaintext 输出的明文多项式
  */
-void encode_matrix_row_to_plaintext(
-    const vector<uint64_t>& matrix_row,
+void encode_vector_to_plaintext(
+    const vector<uint64_t>& vector_data,
     const SEALContext& context,
     Plaintext& plaintext);
 
 /**
- * 从明文多项式系数解码回矩阵行
+ * 从明文多项式系数解码回向量
  * 
  * @param plaintext 明文多项式
  * @param context SEAL上下文
- * @param matrix_row 输出的矩阵行
+ * @param vector_data 输出的向量数据
  */
-void decode_plaintext_to_matrix_row(
+void decode_plaintext_to_vector(
     const Plaintext& plaintext,
     const SEALContext& context,
-    vector<uint64_t>& matrix_row);
+    vector<uint64_t>& vector_data);
 
 /**
- * 将明文矩阵按行编码并加密为密文向量
+ * 将明文矩阵按行或列编码并加密为密文向量
  * 
+ * @param is_row 如果为true则按行编码，否则按列编码
  * @param context SEAL上下文
  * @param encryptor 加密器
  * @param plain_matrix 明文矩阵
  * @param encrypted_matrix 输出的密文向量
  */
-void encrypt_matrix_rows(
+void encrypt_matrix(
+    const bool is_row,
     const SEALContext& context,
     Encryptor& encryptor,
     const vector<vector<uint64_t>>& plain_matrix,
     vector<Ciphertext>& encrypted_matrix);
 
 /**
- * 批量解密密文向量为明文矩阵
+ * 批量解密密文向量为明文矩阵（按行或列）
  *
+ * @param is_row 如果为true则按行解码，否则按列解码
  * @param context SEAL上下文
  * @param decryptor 解密器
  * @param encrypted_matrix 密文向量
  * @param plain_matrix 输出的明文矩阵
  */
 void decrypt_ciphertexts_to_matrix(
+    const bool is_row,
     const SEALContext& context,
     Decryptor& decryptor,
     const vector<Ciphertext>& encrypted_matrix,
@@ -160,5 +138,53 @@ void matrix_multiply_plain_blas(
     const vector<vector<uint64_t>>& B,
     vector<vector<uint64_t>>& C,
     uint64_t modulus);
+
+/**
+ * 使用BLAS对三维矩阵进行转置操作
+ * 
+ * @param input_matrix 输入的三维矩阵 [RNS层][行][列]
+ * @param output_matrix 输出的转置三维矩阵 [RNS层][列][行]
+ */
+void transpose_matrix_blas(
+    const vector<vector<vector<uint64_t>>>& input_matrix,
+    vector<vector<vector<uint64_t>>>& output_matrix);
+
+/**
+ * 对单个系数矩阵进行RNS层矩阵乘法
+ * 
+ * @param plain_matrix 明文矩阵
+ * @param coeff_matrix 系数矩阵 [RNS层][行][列]
+ * @param result_matrix 结果矩阵 [RNS层][行][列]
+ * @param modulus_vector 每个RNS层的模数
+ */
+void Normal_RNS_multiply(
+    const vector<vector<uint64_t>>& plain_matrix,
+    const vector<vector<vector<uint64_t>>>& coeff_matrix,
+    vector<vector<vector<uint64_t>>>& result_matrix,
+    const vector<uint64_t>& modulus_vector);
+
+/**
+ * 使用FLINT对单个系数矩阵进行RNS层矩阵乘法（支持大整数）
+ * 
+ * @param plain_matrix 明文矩阵
+ * @param coeff_matrix 系数矩阵 [RNS层][行][列]
+ * @param result_matrix 结果矩阵 [RNS层][行][列]
+ * @param modulus_vector 每个RNS层的模数
+ */
+void Normal_RNS_multiply_flint(
+    const vector<vector<uint64_t>>& plain_matrix,
+    const vector<vector<vector<uint64_t>>>& coeff_matrix,
+    vector<vector<vector<uint64_t>>>& result_matrix,
+    const vector<uint64_t>& modulus_vector);
+
+/**
+ * 使用FLINT对三维矩阵进行转置操作（支持大整数）
+ * 
+ * @param input_matrix 输入的三维矩阵 [RNS层][行][列]
+ * @param output_matrix 输出的转置三维矩阵 [RNS层][列][行]
+ */
+void transpose_matrix_flint(
+    const vector<vector<vector<uint64_t>>>& input_matrix,
+    vector<vector<vector<uint64_t>>>& output_matrix);
 
 #endif // CPMM_H
