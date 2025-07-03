@@ -9,19 +9,11 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Find BLAS library
 find_package(BLAS REQUIRED)
+find_package(OpenMP REQUIRED)
 
-# Find FLINT library
-find_library(FLINT_LIBRARY NAMES flint)
-find_path(FLINT_INCLUDE_DIR NAMES flint/flint.h)
-
-if(FLINT_LIBRARY AND FLINT_INCLUDE_DIR)
-    set(FLINT_FOUND TRUE)
-    message(STATUS "Found FLINT: ${FLINT_LIBRARY}")
-    message(STATUS "Found FLINT headers: ${FLINT_INCLUDE_DIR}")
-else()
-    set(FLINT_FOUND FALSE)
-    message(WARNING "FLINT not found - FLINT functions will not be available")
-endif()
+# Find nlohmann/json library
+find_package(nlohmann_json 3.2.0 REQUIRED)
+message(STATUS "Found nlohmann/json")
 
 # If not called from root CMakeLists.txt
 if(NOT DEFINED SEAL_BUILD_EXAMPLES)
@@ -78,11 +70,7 @@ if(SEAL_BUILD_EXAMPLES)
         endif()
     endif()
     
-    # Link FLINT library
-    if(FLINT_FOUND)
-        target_link_libraries(example PRIVATE ${FLINT_LIBRARY})
-        target_include_directories(example PRIVATE ${FLINT_INCLUDE_DIR})
-        # FLINT depends on GMP
-        target_link_libraries(example PRIVATE gmp)
-    endif()
+    # Link nlohmann/json library
+    target_link_libraries(example PRIVATE nlohmann_json::nlohmann_json)
+    target_link_libraries(example PRIVATE OpenMP::OpenMP_CXX)
 endif()

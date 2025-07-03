@@ -2,12 +2,14 @@
 #define CPMM_H
 
 #include "seal/seal.h"
+#include "seal/modulus.h"
 #include "seal/util/polyarithsmallmod.h"
 #include "seal/util/common.h"
 #include "seal/util/polycore.h"
 #include "seal/util/scalingvariant.h"
 #include "seal/util/uintarith.h"
 #include "seal/util/uintcore.h"
+#include "seal/util/uintarithsmallmod.h"
 #include "utils.h"
 #include <vector>
 #include <cstdint>
@@ -43,7 +45,7 @@ bool ciphertext_plaintext_matrix_multiply(
  * @param coeff_matrix_b 提取的b多项式系数矩阵 [RNS层][密文索引][多项式系数]
  * @param modulus_vector 每个RNS层的模数
  */
-void extract_coefficients_from_ciphertext_vector(
+double extract_coefficients_from_ciphertext_vector(
     const SEALContext& context,
     const vector<Ciphertext>& encrypted_vector,
     vector<vector<vector<uint64_t>>>& coeff_matrix_a,
@@ -58,7 +60,7 @@ void extract_coefficients_from_ciphertext_vector(
  * @param result_b_matrix 结果b矩阵 [RNS层][行][列]
  * @param result_matrix 输出的密文向量
  */
-void build_ciphertexts_from_result_matrices_2(
+double build_ciphertexts_from_result_matrices_2(
     const SEALContext& context,
     const vector<vector<vector<uint64_t>>>& result_a_matrix,
     const vector<vector<vector<uint64_t>>>& result_b_matrix,
@@ -127,27 +129,13 @@ void decrypt_ciphertexts_to_matrix(
  * @param C 结果矩阵
  * @param modulus 若非0则对结果取模
  */
-void matrix_multiply_plain(
-    const vector<vector<uint64_t>>& A,
-    const vector<vector<uint64_t>>& B,
-    vector<vector<uint64_t>>& C,
-    uint64_t modulus = 0);
 
-void matrix_multiply_plain_blas(
+double matrix_multiply_plain_blas(
     const vector<vector<uint64_t>>& A,
     const vector<vector<uint64_t>>& B,
     vector<vector<uint64_t>>& C,
     uint64_t modulus);
 
-/**
- * 使用BLAS对三维矩阵进行转置操作
- * 
- * @param input_matrix 输入的三维矩阵 [RNS层][行][列]
- * @param output_matrix 输出的转置三维矩阵 [RNS层][列][行]
- */
-void transpose_matrix_blas(
-    const vector<vector<vector<uint64_t>>>& input_matrix,
-    vector<vector<vector<uint64_t>>>& output_matrix);
 
 /**
  * 对单个系数矩阵进行RNS层矩阵乘法
@@ -157,34 +145,10 @@ void transpose_matrix_blas(
  * @param result_matrix 结果矩阵 [RNS层][行][列]
  * @param modulus_vector 每个RNS层的模数
  */
-void Normal_RNS_multiply(
+double Normal_RNS_multiply(
     const vector<vector<uint64_t>>& plain_matrix,
     const vector<vector<vector<uint64_t>>>& coeff_matrix,
     vector<vector<vector<uint64_t>>>& result_matrix,
     const vector<uint64_t>& modulus_vector);
-
-/**
- * 使用FLINT对单个系数矩阵进行RNS层矩阵乘法（支持大整数）
- * 
- * @param plain_matrix 明文矩阵
- * @param coeff_matrix 系数矩阵 [RNS层][行][列]
- * @param result_matrix 结果矩阵 [RNS层][行][列]
- * @param modulus_vector 每个RNS层的模数
- */
-void Normal_RNS_multiply_flint(
-    const vector<vector<uint64_t>>& plain_matrix,
-    const vector<vector<vector<uint64_t>>>& coeff_matrix,
-    vector<vector<vector<uint64_t>>>& result_matrix,
-    const vector<uint64_t>& modulus_vector);
-
-/**
- * 使用FLINT对三维矩阵进行转置操作（支持大整数）
- * 
- * @param input_matrix 输入的三维矩阵 [RNS层][行][列]
- * @param output_matrix 输出的转置三维矩阵 [RNS层][列][行]
- */
-void transpose_matrix_flint(
-    const vector<vector<vector<uint64_t>>>& input_matrix,
-    vector<vector<vector<uint64_t>>>& output_matrix);
 
 #endif // CPMM_H

@@ -1,9 +1,4 @@
 #include "ccmm.h"
-#include <flint/flint.h>
-#include <flint/fmpz.h>
-#include <flint/fmpz_mat.h>
-#include <flint/fmpz_mod.h>
-#include <flint/fmpz_mod_mat.h>
 #include "seal/util/uintarithsmallmod.h"
 #include <chrono>
 
@@ -36,6 +31,13 @@ void RNS_RNS_multiply(
     cout << "开始使用BLAS进行RNS-RNS矩阵乘法计算..." << endl;
     cout << "RNS层数: " << rns_layers << endl;
 
+    // 计时变量
+    auto start_time = chrono::high_resolution_clock::now();
+    auto end_time = chrono::high_resolution_clock::now();
+    chrono::duration<double> total_convert_time(0);
+    chrono::duration<double> total_blas_time(0);
+    chrono::duration<double> total_mod_time(0);
+
     result_matrix.resize(rns_layers);
 
     for (size_t rns_layer = 0; rns_layer < rns_layers; rns_layer++) {
@@ -58,6 +60,7 @@ void RNS_RNS_multiply(
         result_matrix[rns_layer].resize(matrix1_rows, vector<uint64_t>(matrix2_cols));
 
         // 转换为double数组
+        auto convert_start = chrono::high_resolution_clock::now();
         std::vector<double> matrix1_double(matrix1_rows * matrix1_cols);
         std::vector<double> matrix2_double(matrix2_rows * matrix2_cols);
         
@@ -72,26 +75,46 @@ void RNS_RNS_multiply(
                 matrix2_double[i * matrix2_cols + j] = static_cast<double>(coeff_matrix_2[rns_layer][i][j]);
             }
         }
+        auto convert_end = chrono::high_resolution_clock::now();
+        total_convert_time += chrono::duration<double>(convert_end - convert_start);
 
         std::vector<double> result_double(matrix1_rows * matrix2_cols);
 
         // 使用BLAS进行矩阵乘法: result = matrix1 * matrix2
+        auto blas_start = chrono::high_resolution_clock::now();
         cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
                     matrix1_rows, matrix2_cols, matrix1_cols, 1.0,
                     matrix1_double.data(), matrix1_cols,
                     matrix2_double.data(), matrix2_cols, 0.0,
                     result_double.data(), matrix2_cols);
+        auto blas_end = chrono::high_resolution_clock::now();
+        total_blas_time += chrono::duration<double>(blas_end - blas_start);
         
         // 转换回uint64_t并应用模运算
+        auto mod_start = chrono::high_resolution_clock::now();
         uint64_t modulus = modulus_vector[rns_layer];
         for(size_t i = 0; i < matrix1_rows; ++i) {
             for(size_t j = 0; j < matrix2_cols; ++j) {
                 result_matrix[rns_layer][i][j] = static_cast<uint64_t>(fmod(result_double[i * matrix2_cols + j], modulus));
             }
         }
+        auto mod_end = chrono::high_resolution_clock::now();
+        total_mod_time += chrono::duration<double>(mod_end - mod_start);
     }
 
+    end_time = chrono::high_resolution_clock::now();
+    auto total_time = chrono::duration<double>(end_time - start_time);
+
     cout << "\nBLAS RNS-RNS矩阵乘法计算完成！" << endl;
+    cout << "\n[RNS-RNS] ========== RNS-RNS矩阵乘法时间统计 ==========" << endl;
+    cout << "RNS层数: " << rns_layers << endl;
+    cout << "数据类型转换时间: " << total_convert_time.count() << " 秒" << endl;
+    cout << "BLAS矩阵乘法时间: " << total_blas_time.count() << " 秒" << endl;
+    cout << "模运算时间:       " << total_mod_time.count() << " 秒" << endl;
+    cout << "----------------------------------------" << endl;
+    cout << "总时间:            " << total_time.count() << " 秒" << endl;
+    cout << "平均每层时间:      " << total_time.count() / rns_layers << " 秒" << endl;
+    cout << "=========================================" << endl;
 }
 
 bool ciphertext_ciphertext_matrix_multiply(
@@ -141,8 +164,8 @@ bool ciphertext_ciphertext_matrix_multiply(
         cout << "\n步骤2/4: 转置系数矩阵..." << endl;
         // 步骤1: 转置系数矩阵
         vector<vector<vector<uint64_t>>> coeff_matrix_1_a_T, coeff_matrix_1_b_T;
-        transpose_matrix_blas(coeff_matrix_1_a, coeff_matrix_1_a_T);
-        transpose_matrix_blas(coeff_matrix_1_b, coeff_matrix_1_b_T);
+        // transpose_matrix_blas(coeff_matrix_1_a, coeff_matrix_1_a_T);
+        // transpose_matrix_blas(coeff_matrix_1_b, coeff_matrix_1_b_T);
 
         // vector<vector<vector<uint64_t>>> coeff_matrix_1_a_T_flint, coeff_matrix_1_b_T_flint;
         // transpose_matrix_flint(coeff_matrix_1_a, coeff_matrix_1_a_T_flint);
@@ -162,10 +185,10 @@ bool ciphertext_ciphertext_matrix_multiply(
         // RNS_RNS_multiply_flint(coeff_matrix_1_b_T, coeff_matrix_2_b, result_c11_matrix, modulus_vector);
 
         vector<vector<vector<uint64_t>>> result_d0_matrix, result_d1_matrix, result_d2_matrix, result_d3_matrix;
-        transpose_matrix_blas(result_c00_matrix, result_d0_matrix);
+        // transpose_matrix_blas(result_c00_matrix, result_d0_matrix);
         // transpose_matrix_flint(result_c00_matrix, result_d0_matrix);
         result_d1_matrix.resize(result_c00_matrix.size(), vector<vector<uint64_t>>(result_c00_matrix[0].size(), vector<uint64_t>(result_c00_matrix[0][0].size(), 0)));
-        transpose_matrix_blas(result_c01_matrix, result_d2_matrix);
+        // transpose_matrix_blas(result_c01_matrix, result_d2_matrix);
         // transpose_matrix_flint(result_c01_matrix, result_d2_matrix);
         result_d3_matrix.resize(result_c01_matrix.size(), vector<vector<uint64_t>>(result_c01_matrix[0].size(), vector<uint64_t>(result_c01_matrix[0][0].size(), 0)));
 
@@ -361,212 +384,6 @@ void build_ciphertexts_from_result_matrices_3(
     cout << "\n密文构建完成（3个多项式）！" << endl;
 }
 
-void RNS_RNS_multiply_flint(
-    const vector<vector<vector<uint64_t>>>& coeff_matrix_1,
-    const vector<vector<vector<uint64_t>>>& coeff_matrix_2,
-    vector<vector<vector<uint64_t>>>& result_matrix,
-    const vector<uint64_t>& modulus_vector)
-{
-    if (coeff_matrix_1.empty() || coeff_matrix_2.empty()) {
-        cerr << "Empty matrices in multiplication" << endl;
-        return;
-    }
-
-    size_t rns_layers = coeff_matrix_1.size();
-    
-    // 检查RNS层数是否一致
-    if (coeff_matrix_2.size() != rns_layers) {
-        cerr << "RNS layer count mismatch: matrix1 has " << rns_layers 
-             << " layers, matrix2 has " << coeff_matrix_2.size() << " layers" << endl;
-        return;
-    }
-    
-    if (modulus_vector.size() != rns_layers) {
-        cerr << "Modulus vector size mismatch: expected " << rns_layers 
-             << ", got " << modulus_vector.size() << endl;
-        return;
-    }
-
-    cout << "开始使用FLINT进行RNS-RNS矩阵乘法计算..." << endl;
-    cout << "RNS层数: " << rns_layers << endl;
-
-    result_matrix.resize(rns_layers);
-
-    for (size_t rns_layer = 0; rns_layer < rns_layers; rns_layer++) {
-        cout << "\r处理RNS层: " << (rns_layer + 1) << "/" << rns_layers 
-             << " [" << (rns_layer + 1) * 100 / rns_layers << "%]" << flush;
-
-        size_t matrix1_rows = coeff_matrix_1[rns_layer].size();
-        size_t matrix1_cols = coeff_matrix_1[rns_layer][0].size();
-        size_t matrix2_rows = coeff_matrix_2[rns_layer].size();
-        size_t matrix2_cols = coeff_matrix_2[rns_layer][0].size();
-        
-        // 检查矩阵维度是否匹配
-        if (matrix1_cols != matrix2_rows) {
-            cerr << "\nMatrix dimensions do not match for multiplication at RNS layer " << rns_layer 
-                 << ": matrix1 is " << matrix1_rows << "x" << matrix1_cols 
-                 << ", matrix2 is " << matrix2_rows << "x" << matrix2_cols << endl;
-            return;
-        }
-
-        result_matrix[rns_layer].resize(matrix1_rows, vector<uint64_t>(matrix2_cols));
-
-        // 使用FLINT进行矩阵乘法
-        fmpz_t modulus;
-        fmpz_init_set_ui(modulus, modulus_vector[rns_layer]);
-        
-        fmpz_mod_mat_t mat1, mat2, result;
-        fmpz_mod_mat_init(mat1, matrix1_rows, matrix1_cols, modulus);
-        fmpz_mod_mat_init(mat2, matrix2_rows, matrix2_cols, modulus);
-        fmpz_mod_mat_init(result, matrix1_rows, matrix2_cols, modulus);
-        
-        // 填充矩阵1
-        for (size_t i = 0; i < matrix1_rows; i++) {
-            for (size_t j = 0; j < matrix1_cols; j++) {
-                fmpz_t val;
-                fmpz_init_set_ui(val, coeff_matrix_1[rns_layer][i][j]);
-                fmpz_mod_mat_set_entry(mat1, i, j, val);
-                fmpz_clear(val);
-            }
-        }
-        
-        // 填充矩阵2
-        for (size_t i = 0; i < matrix2_rows; i++) {
-            for (size_t j = 0; j < matrix2_cols; j++) {
-                fmpz_t val;
-                fmpz_init_set_ui(val, coeff_matrix_2[rns_layer][i][j]);
-                fmpz_mod_mat_set_entry(mat2, i, j, val);
-                fmpz_clear(val);
-            }
-        }
-        
-        // 执行矩阵乘法
-        fmpz_mod_mat_mul(result, mat1, mat2);
-        
-        // 提取结果
-        for (size_t i = 0; i < matrix1_rows; i++) {
-            for (size_t j = 0; j < matrix2_cols; j++) {
-                fmpz_t val;
-                fmpz_init(val);
-                fmpz_mod_mat_get_entry(val, result, i, j);
-                result_matrix[rns_layer][i][j] = fmpz_get_ui(val);
-                fmpz_clear(val);
-            }
-        }
-        
-        // 清理FLINT对象
-        fmpz_mod_mat_clear(mat1);
-        fmpz_mod_mat_clear(mat2);
-        fmpz_mod_mat_clear(result);
-        fmpz_clear(modulus);
-    }
-
-    cout << "\nFLINT RNS-RNS矩阵乘法计算完成！" << endl;
-}
-
-void matrix_add_plain_flint(
-    const vector<vector<vector<uint64_t>>>& coeff_matrix_1,
-    const vector<vector<vector<uint64_t>>>& coeff_matrix_2,
-    vector<vector<vector<uint64_t>>>& result_matrix,
-    const vector<uint64_t>& modulus_vector)
-{
-    if (coeff_matrix_1.empty() || coeff_matrix_2.empty()) {
-        cerr << "Empty matrices in addition" << endl;
-        return;
-    }
-
-    size_t rns_layers = coeff_matrix_1.size();
-    
-    // 检查RNS层数是否一致
-    if (coeff_matrix_2.size() != rns_layers) {
-        cerr << "RNS layer count mismatch: matrix1 has " << rns_layers 
-             << " layers, matrix2 has " << coeff_matrix_2.size() << " layers" << endl;
-        return;
-    }
-    
-    if (modulus_vector.size() != rns_layers) {
-        cerr << "Modulus vector size mismatch: expected " << rns_layers 
-             << ", got " << modulus_vector.size() << endl;
-        return;
-    }
-
-    cout << "开始使用FLINT进行RNS-RNS矩阵加法计算..." << endl;
-    cout << "RNS层数: " << rns_layers << endl;
-
-    result_matrix.resize(rns_layers);
-
-    for (size_t rns_layer = 0; rns_layer < rns_layers; rns_layer++) {
-        cout << "\r处理RNS层: " << (rns_layer + 1) << "/" << rns_layers 
-             << " [" << (rns_layer + 1) * 100 / rns_layers << "%]" << flush;
-
-        size_t matrix1_rows = coeff_matrix_1[rns_layer].size();
-        size_t matrix1_cols = coeff_matrix_1[rns_layer][0].size();
-        size_t matrix2_rows = coeff_matrix_2[rns_layer].size();
-        size_t matrix2_cols = coeff_matrix_2[rns_layer][0].size();
-        
-        // 检查矩阵维度是否匹配
-        if (matrix1_rows != matrix2_rows || matrix1_cols != matrix2_cols) {
-            cerr << "\nMatrix dimensions do not match for addition at RNS layer " << rns_layer 
-                 << ": matrix1 is " << matrix1_rows << "x" << matrix1_cols 
-                 << ", matrix2 is " << matrix2_rows << "x" << matrix2_cols << endl;
-            return;
-        }
-
-        result_matrix[rns_layer].resize(matrix1_rows, vector<uint64_t>(matrix1_cols));
-
-        // 使用FLINT进行矩阵加法
-        fmpz_t modulus;
-        fmpz_init_set_ui(modulus, modulus_vector[rns_layer]);
-        
-        fmpz_mod_mat_t mat1, mat2, result;
-        fmpz_mod_mat_init(mat1, matrix1_rows, matrix1_cols, modulus);
-        fmpz_mod_mat_init(mat2, matrix2_rows, matrix2_cols, modulus);
-        fmpz_mod_mat_init(result, matrix1_rows, matrix1_cols, modulus);
-        
-        // 填充矩阵1
-        for (size_t i = 0; i < matrix1_rows; i++) {
-            for (size_t j = 0; j < matrix1_cols; j++) {
-                fmpz_t val;
-                fmpz_init_set_ui(val, coeff_matrix_1[rns_layer][i][j]);
-                fmpz_mod_mat_set_entry(mat1, i, j, val);
-                fmpz_clear(val);
-            }
-        }
-        
-        // 填充矩阵2
-        for (size_t i = 0; i < matrix2_rows; i++) {
-            for (size_t j = 0; j < matrix2_cols; j++) {
-                fmpz_t val;
-                fmpz_init_set_ui(val, coeff_matrix_2[rns_layer][i][j]);
-                fmpz_mod_mat_set_entry(mat2, i, j, val);
-                fmpz_clear(val);
-            }
-        }
-        
-        // 执行矩阵加法
-        fmpz_mod_mat_add(result, mat1, mat2);
-        
-        // 提取结果
-        for (size_t i = 0; i < matrix1_rows; i++) {
-            for (size_t j = 0; j < matrix1_cols; j++) {
-                fmpz_t val;
-                fmpz_init(val);
-                fmpz_mod_mat_get_entry(val, result, i, j);
-                result_matrix[rns_layer][i][j] = fmpz_get_ui(val);
-                fmpz_clear(val);
-            }
-        }
-        
-        // 清理FLINT对象
-        fmpz_mod_mat_clear(mat1);
-        fmpz_mod_mat_clear(mat2);
-        fmpz_mod_mat_clear(result);
-        fmpz_clear(modulus);
-    }
-
-    cout << "\nFLINT RNS-RNS矩阵加法计算完成！" << endl;
-}
-
 void ciphertext_matrix_transpose(
     const SEALContext& context,
     const GaloisKeys& galois_keys,
@@ -588,101 +405,128 @@ void ciphertext_matrix_transpose(
     // 计时变量
     auto start_time = chrono::high_resolution_clock::now();
     auto end_time = chrono::high_resolution_clock::now();
+    chrono::duration<double> step1_time(0);
+    chrono::duration<double> step2_time(0);
+    chrono::duration<double> step3_time(0);
     chrono::duration<double> inv_time(0);
     chrono::duration<double> shift_time(0);
     chrono::duration<double> add_time(0);
     chrono::duration<double> galois_time(0);
 
     // Step 1: 计算 tilde_m_t = sum_i m_i(X) * X^{i*(2t+1)^{-1}}
+    cout << "\n[CM-T] Step 1: 计算 tilde_m_t = sum_i m_i(X) * X^{i*(2t+1)^{-1}}" << endl;
+    start_time = chrono::high_resolution_clock::now();
+    
     vector<Ciphertext> tilde_m(N);
     for (size_t t = 0; t < N; t++) {
         cout << "\r[CM-T] 处理tilde_m_t: " << (t + 1) << "/" << N << " [" << (t + 1) * 100 / N << "%]" << flush;
-        uint64_t two_t_plus_one = (2 * t + 1) % (2 * N);
+        uint64_t two_t_plus_one = 2 * t + 1;
 
-        start_time = chrono::high_resolution_clock::now();
+        auto inv_start = chrono::high_resolution_clock::now();
         uint64_t inv_two_t_plus_one = modinv(two_t_plus_one, 2 * N);
-        end_time = chrono::high_resolution_clock::now();
-        inv_time += chrono::duration<double>(end_time - start_time);
+        auto inv_end = chrono::high_resolution_clock::now();
+        inv_time += chrono::duration<double>(inv_end - inv_start);
 
         bool first = true;
         for (size_t i = 0; i < N; i++) {
-            // 计算 i * (2t+1)^{-1} mod 2N
-            uint64_t shift = (i * inv_two_t_plus_one) % (2 * N);
+            // 计算 i * (2t+1)^{-1}
+            uint64_t shift = i * inv_two_t_plus_one;
 
-            start_time = chrono::high_resolution_clock::now();
+            auto shift_start = chrono::high_resolution_clock::now();
             // 使用 negacyclic_shift_poly_coeffmod 直接处理整个密文
             Ciphertext shifted_ct = row_encrypted_matrix[i];
             util::negacyclic_shift_poly_coeffmod(
                 shifted_ct, shifted_ct.size(), shift, 
                 context_data->parms().coeff_modulus(), shifted_ct
             );
-            end_time = chrono::high_resolution_clock::now();
-            shift_time += chrono::duration<double>(end_time - start_time);
+            auto shift_end = chrono::high_resolution_clock::now();
+            shift_time += chrono::duration<double>(shift_end - shift_start);
             
-            start_time = chrono::high_resolution_clock::now();
+            auto add_start = chrono::high_resolution_clock::now();
             if (first) {
                 tilde_m[t] = shifted_ct;
                 first = false;
             } else {
                 evaluator.add_inplace(tilde_m[t], shifted_ct);
             }
-            end_time = chrono::high_resolution_clock::now();
-            add_time += chrono::duration<double>(end_time - start_time);
+            auto add_end = chrono::high_resolution_clock::now();
+            add_time += chrono::duration<double>(add_end - add_start);
         }
     }
+    end_time = chrono::high_resolution_clock::now();
+    step1_time = chrono::duration<double>(end_time - start_time);
     cout << endl;
+    
     // Step 2: 计算 bar_m_t = tilde_m_t(X^{2t+1})
+    cout << "\n[CM-T] Step 2: 计算 bar_m_t = tilde_m_t(X^{2t+1})" << endl;
+    start_time = chrono::high_resolution_clock::now();
+    
     vector<Ciphertext> bar_m(N);
     for (size_t t = 0; t < N; t++) {
         cout << "\r[CM-T] 处理bar_m_t: " << (t + 1) << "/" << N << " [" << (t + 1) * 100 / N << "%]" << flush;
         bar_m[t] = tilde_m[t];
-        start_time = chrono::high_resolution_clock::now();
-        evaluator.apply_galois_inplace(bar_m[t], (2 * t + 1) % (2 * N), galois_keys);
-        end_time = chrono::high_resolution_clock::now();
-        galois_time += chrono::duration<double>(end_time - start_time);
+        auto galois_start = chrono::high_resolution_clock::now();
+        evaluator.apply_galois_inplace(bar_m[t], 2 * t + 1, galois_keys);
+        auto galois_end = chrono::high_resolution_clock::now();
+        galois_time += chrono::duration<double>(galois_end - galois_start);
     }
+    end_time = chrono::high_resolution_clock::now();
+    step2_time = chrono::duration<double>(end_time - start_time);
     cout << endl;
+    
     // Step 3: 计算 m'_j = N^{-1} * sum_t bar_m_t(X) * X^{-j*(2t+1)}
+    cout << "\n[CM-T] Step 3: 计算 m'_j = sum_t bar_m_t(X) * X^{-j*(2t+1)}" << endl;
+    start_time = chrono::high_resolution_clock::now();
+    
     col_encrypted_matrix.resize(N);
     
     for (size_t j = 0; j < N; j++) {
         cout << "\r[CM-T] 处理m'_j: " << (j + 1) << "/" << N << " [" << (j + 1) * 100 / N << "%]" << flush;
         bool first = true;
         for (size_t t = 0; t < N; t++) {
-            uint64_t two_t_plus_one = (2 * t + 1) % (2 * N);
-            // 计算 -j*(2t+1) mod N
-            uint64_t shift = (2 * N - (j * two_t_plus_one) % (2 * N)) % (2 * N);
+            uint64_t two_t_plus_one = (2 * t + 1);
+            // 计算 -j*(2t+1)
+            uint64_t shift = - (j * two_t_plus_one);
             Ciphertext shifted_ct = bar_m[t];
-            start_time = chrono::high_resolution_clock::now();
+            auto shift_start = chrono::high_resolution_clock::now();
             util::negacyclic_shift_poly_coeffmod(
                 shifted_ct, shifted_ct.size(), shift, 
                 context_data->parms().coeff_modulus(), shifted_ct
             );
-            end_time = chrono::high_resolution_clock::now();
-            shift_time += chrono::duration<double>(end_time - start_time);
+            auto shift_end = chrono::high_resolution_clock::now();
+            shift_time += chrono::duration<double>(shift_end - shift_start);
             
-            start_time = chrono::high_resolution_clock::now();
+            auto add_start = chrono::high_resolution_clock::now();
             if (first) {
                 col_encrypted_matrix[j] = shifted_ct;
                 first = false;
             } else {
                 evaluator.add_inplace(col_encrypted_matrix[j], shifted_ct);
             }
-            end_time = chrono::high_resolution_clock::now();
-            add_time += chrono::duration<double>(end_time - start_time);
+            auto add_end = chrono::high_resolution_clock::now();
+            add_time += chrono::duration<double>(add_end - add_start);
         }
-        util::multiply_poly_scalar_coeffmod(
-            col_encrypted_matrix[j], col_encrypted_matrix[j].size(), N_inv_mod_q,
-            context_data->parms().coeff_modulus(), col_encrypted_matrix[j]
-        );
+        // util::multiply_poly_scalar_coeffmod(
+        //     col_encrypted_matrix[j], col_encrypted_matrix[j].size(), N_inv_mod_q,
+        //     context_data->parms().coeff_modulus(), col_encrypted_matrix[j]
+        // );
     }
     
-    cout << "\n[CM-T] 时间统计:" << endl;
+    end_time = chrono::high_resolution_clock::now();
+    step3_time = chrono::duration<double>(end_time - start_time);
+    
+    cout << "\n[CM-T] ========== 时间统计 ==========" << endl;
+    cout << "Step 1 (tilde_m_t): " << step1_time.count() << " 秒" << endl;
+    cout << "Step 2 (bar_m_t):   " << step2_time.count() << " 秒" << endl;
+    cout << "Step 3 (m'_j):      " << step3_time.count() << " 秒" << endl;
+    cout << "----------------------------------------" << endl;
+    cout << "总时间:              " << (step1_time + step2_time + step3_time).count() << " 秒" << endl;
+    cout << "\n[CM-T] 详细操作时间:" << endl;
     cout << "  模逆元计算时间: " << inv_time.count() << " 秒" << endl;
     cout << "  多项式移位时间: " << shift_time.count() << " 秒" << endl;
     cout << "  密文加法时间: " << add_time.count() << " 秒" << endl;
     cout << "  Galois自同构时间: " << galois_time.count() << " 秒" << endl;
-    cout << "  总时间: " << (inv_time + shift_time + add_time + galois_time).count() << " 秒" << endl;
+    cout << "=========================================" << endl;
     
     cout << "[CM-T] 密文矩阵转置完成！" << endl;
 }
@@ -699,8 +543,19 @@ void ciphertext_matrix_transpose_tweak(
         cerr << "TWEAK算法要求N为2的幂" << endl;
         return;
     }
+    
+    // 计时变量
+    auto start_time = chrono::high_resolution_clock::now();
+    auto end_time = chrono::high_resolution_clock::now();
+    chrono::duration<double> step1_time(0);
+    chrono::duration<double> step2_time(0);
+    chrono::duration<double> step3_time(0);
+    chrono::duration<double> step4_time(0);
+    
     // Step 1: aux = TWEAK(N, {X^i * ct_i})
-    cout << "[TWEAK] 开始计算TWEAK(N, {X^i * ct_i})" << endl;
+    cout << "\n[TWEAK] Step 1: aux = TWEAK(N, {X^i * ct_i})" << endl;
+    start_time = chrono::high_resolution_clock::now();
+    
     vector<Ciphertext> x_ct(N);
     auto context_data = context.get_context_data(context.first_parms_id());
     for (size_t i = 0; i < N; ++i) {
@@ -713,10 +568,16 @@ void ciphertext_matrix_transpose_tweak(
     }
     vector<Ciphertext> aux;
     ciphertext_tweak(context, x_ct, evaluator, aux);
+    
+    end_time = chrono::high_resolution_clock::now();
+    step1_time = chrono::duration<double>(end_time - start_time);
+    cout << endl;
 
     // Step 2: aux'_j = (N^{-1} mod Q) * aux_{((2j+1)^{-1} mod 2N-1)/2}
     //          aux'_j = Auto(aux'_j, 2j+1)
-    cout << "\n[TWEAK] 开始计算aux'_j = (N^{-1} mod Q) * aux_{((2j+1)^{-1} mod 2N-1)/2}" << endl;
+    cout << "\n[TWEAK] Step 2: aux'_j = (N^{-1} mod Q) * aux_{((2j+1)^{-1} mod 2N-1)/2}" << endl;
+    start_time = chrono::high_resolution_clock::now();
+    
     vector<Ciphertext> aux_prime(N);
     uint64_t N_inv_mod_q = 0;
     // 取第一个modulus
@@ -748,11 +609,26 @@ void ciphertext_matrix_transpose_tweak(
         // Auto(aux'_j, 2j+1)
         evaluator.apply_galois_inplace(aux_prime[j], 2*j+1, galois_keys);
     }
+    
+    end_time = chrono::high_resolution_clock::now();
+    step2_time = chrono::duration<double>(end_time - start_time);
+    cout << endl;
+    
     // Step 3: ct'' = TWEAK(N, aux')
-    cout << "\n[TWEAK] 开始计算ct'' = TWEAK(N, aux')" << endl;
+    cout << "\n[TWEAK] Step 3: ct'' = TWEAK(N, aux')" << endl;
+    start_time = chrono::high_resolution_clock::now();
+    
     vector<Ciphertext> ct2;
     ciphertext_tweak(context, aux_prime, evaluator, ct2);
+    
+    end_time = chrono::high_resolution_clock::now();
+    step3_time = chrono::duration<double>(end_time - start_time);
+    cout << endl;
+    
     // Step 4: ct'_j = ct2_{j} - X^{-j} * ct2_{N-j mod N}
+    cout << "\n[TWEAK] Step 4: ct'_j = ct2_{j} - X^{-j} * ct2_{N-j mod N}" << endl;
+    start_time = chrono::high_resolution_clock::now();
+    
     col_encrypted_matrix.resize(N);
     for (size_t j = 0; j < N; ++j) {
         cout << "\r[TWEAK] 处理ct'_j: " << (j + 1) << "/" << N << " [" << (j + 1) * 100 / N << "%]" << flush;
@@ -764,6 +640,21 @@ void ciphertext_matrix_transpose_tweak(
         );
         evaluator.sub_inplace(col_encrypted_matrix[j], neg_j_ct);
     }
+    
+    end_time = chrono::high_resolution_clock::now();
+    step4_time = chrono::duration<double>(end_time - start_time);
+    cout << endl;
+    
+    cout << "\n[TWEAK] ========== 时间统计 ==========" << endl;
+    cout << "Step 1 (aux = TWEAK): " << step1_time.count() << " 秒" << endl;
+    cout << "Step 2 (aux'_j):      " << step2_time.count() << " 秒" << endl;
+    cout << "Step 3 (ct'' = TWEAK): " << step3_time.count() << " 秒" << endl;
+    cout << "Step 4 (ct'_j):       " << step4_time.count() << " 秒" << endl;
+    cout << "----------------------------------------" << endl;
+    cout << "总时间:                " << (step1_time + step2_time + step3_time + step4_time).count() << " 秒" << endl;
+    cout << "=========================================" << endl;
+    
+    cout << "[TWEAK] 密文矩阵转置完成！" << endl;
 }
 
 void ciphertext_tweak(const SEALContext& context, const vector<Ciphertext>& ct, Evaluator& evaluator, vector<Ciphertext>& ct_out) {

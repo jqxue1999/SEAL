@@ -71,44 +71,6 @@ void build_ciphertexts_from_result_matrices_3(
     vector<Ciphertext>& result_matrix);
 
 /**
- * 使用FLINT对两个RNS系数矩阵进行乘法运算（支持大整数）
- * 
- * @param coeff_matrix_1 第一个系数矩阵 [RNS层][行][列]
- * @param coeff_matrix_2 第二个系数矩阵 [RNS层][行][列]
- * @param result_matrix 结果矩阵 [RNS层][行][列]
- * @param modulus_vector 每个RNS层的模数
- */
-void RNS_RNS_multiply_flint(
-    const vector<vector<vector<uint64_t>>>& coeff_matrix_1,
-    const vector<vector<vector<uint64_t>>>& coeff_matrix_2,
-    vector<vector<vector<uint64_t>>>& result_matrix,
-    const vector<uint64_t>& modulus_vector);
-
-/**
- * 使用FLINT对两个RNS系数矩阵进行加法运算（支持大整数）
- * 
- * @param coeff_matrix_1 第一个系数矩阵 [RNS层][行][列]
- * @param coeff_matrix_2 第二个系数矩阵 [RNS层][行][列]
- * @param result_matrix 结果矩阵 [RNS层][行][列]
- * @param modulus_vector 每个RNS层的模数
- */
-void matrix_add_plain_flint(
-    const vector<vector<vector<uint64_t>>>& coeff_matrix_1,
-    const vector<vector<vector<uint64_t>>>& coeff_matrix_2,
-    vector<vector<vector<uint64_t>>>& result_matrix,
-    const vector<uint64_t>& modulus_vector);
-
-/**
- * 使用FLINT对三维矩阵进行转置操作（支持大整数）
- * 
- * @param input_matrix 输入的三维矩阵 [RNS层][行][列]
- * @param output_matrix 输出的转置三维矩阵 [RNS层][列][行]
- */
-void transpose_matrix_flint(
-    const vector<vector<vector<uint64_t>>>& input_matrix,
-    vector<vector<vector<uint64_t>>>& output_matrix);
-
-/**
  * 密文矩阵转置（CM-T算法）：将按行加密的密文向量转为按列加密的密文向量
  * @param context SEAL上下文
  * @param galois_keys Galois密钥

@@ -1,0 +1,21 @@
+{
+  "poly_modulus_degree_options": [2048, 4096, 8192, 16384],
+  "coeff_modulus_configs": {
+    "2048": {
+      "description": "Small degree for basic testing",
+      "coeff_modulus": [36, 36, 37]
+    },
+    "4096": {
+      "description": "Medium degree for standard operations",
+      "coeff_modulus": [36, 36, 37]
+    },
+    "8192": {
+      "description": "Large degree for complex operations",
+      "coeff_modulus": [36, 36, 36, 36, 37]
+    },
+    "16384": {
+      "description": "Very large degree for high precision",
+      "coeff_modulus": [36, 36, 36, 36, 37]
+    }
+  }
+} 

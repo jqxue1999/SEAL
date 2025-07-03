@@ -1,9 +1,86 @@
 #include "example.h"
 #include <chrono>
 #include <cstdlib>
+#include <cblas.h>
+#include <unistd.h>
 
 using namespace seal;
 using namespace std;
+
+json read_seal_config(const string& config_file) {
+    json config;
+    
+    // 打印当前工作目录
+    char cwd[1024];
+    if (getcwd(cwd, sizeof(cwd)) != NULL) {
+        cout << "当前工作目录: " << cwd << endl;
+    } else {
+        cout << "无法获取当前工作目录" << endl;
+    }
+    
+    // 直接使用固定路径
+    string config_path = "../../" + config_file;
+    cout << "尝试读取配置文件: " << config_path << endl;
+    
+    try {
+        ifstream file(config_path);
+        if (file.is_open()) {
+            file >> config;
+            file.close();
+            cout << "成功读取配置文件: " << config_path << endl;
+            return config;
+        } else {
+            cerr << "错误: 无法打开配置文件 " << config_path << endl;
+        }
+    } catch (const exception& e) {
+        cerr << "错误: 解析配置文件失败: " << e.what() << endl;
+    }
+    
+    return config;
+}
+
+size_t get_user_poly_modulus_degree(const json& config) {
+    vector<size_t> options = config["poly_modulus_degree_options"].get<vector<size_t>>();
+    
+    cout << "\n=== 选择多项式模数次数 ===" << endl;
+    cout << "可选的次数: ";
+    for (size_t i = 0; i < options.size(); i++) {
+        cout << options[i];
+        if (i < options.size() - 1) cout << ", ";
+    }
+    cout << endl;
+    
+    while (true) {
+        cout << "请输入多项式模数次数: ";
+        size_t user_choice;
+        cin >> user_choice;
+        
+        // 检查输入是否在有效范围内
+        for (size_t option : options) {
+            if (option == user_choice) {
+                cout << "已选择: " << user_choice << endl;
+                return user_choice;
+            }
+        }
+        
+        cout << "无效选择！请输入以下值之一: ";
+        for (size_t i = 0; i < options.size(); i++) {
+            cout << options[i];
+            if (i < options.size() - 1) cout << ", ";
+        }
+        cout << endl;
+    }
+}
+
+vector<int> get_coeff_modulus_params(const json& config, size_t poly_modulus_degree) {
+    string degree_str = to_string(poly_modulus_degree);
+    if (config["coeff_modulus_configs"].contains(degree_str)) {
+        return config["coeff_modulus_configs"][degree_str]["coeff_modulus"].get<vector<int>>();
+    } else {
+        cerr << "错误: 配置文件中未找到多项式模数次数 " << poly_modulus_degree << " 的参数" << endl;
+        return vector<int>();
+    }
+}
 
 void print_menu() {
     cout << "\n=== SEAL 矩阵乘法测试程序 ===" << endl;
@@ -11,21 +88,35 @@ void print_menu() {
     cout << "1. CPMM (Ciphertext-Plaintext Matrix Multiplication) - 密文-明文矩阵乘法" << endl;
     cout << "2. CCMM (Ciphertext-Ciphertext Matrix Multiplication) - 密文-密文矩阵乘法" << endl;
     cout << "3. CMT (Ciphertext Matrix Transpose) - 密文矩阵转置" << endl;
-    cout << "4. Test Function - 测试CM-T算法第二步Galois Automorphism" << endl;
+    cout << "4. BLAS Performance Test - 测试BLAS浮点矩阵乘法性能" << endl;
     cout << "5. 退出程序" << endl;
     cout << "请输入选择 (1-5): ";
 }
 
 int test_cpmm() {
     try {
+        // 读取配置文件
+        json config = read_seal_config();
+        if (config.empty()) {
+            cerr << "无法读取配置文件，使用默认参数" << endl;
+            return 1;
+        }
+        
+        // 获取用户输入的多项式模数次数
+        size_t poly_modulus_degree = get_user_poly_modulus_degree(config);
+        
+        // 获取对应的系数模数参数
+        vector<int> coeff_modulus_params = get_coeff_modulus_params(config, poly_modulus_degree);
+        if (coeff_modulus_params.empty()) {
+            cerr << "无法获取系数模数参数" << endl;
+            return 1;
+        }
+        
         // 设置加密参数
         scheme_type scheme = scheme_type::bfv;
         EncryptionParameters parms(scheme);
-        size_t poly_modulus_degree = 4096;
         parms.set_poly_modulus_degree(poly_modulus_degree);
-        parms.set_coeff_modulus(CoeffModulus::BFVDefault(poly_modulus_degree));
-        // Double can only represent 2^53-1, so we need to carefully design a new coeff_modulus for degree 8192
-        // parms.set_coeff_modulus(CoeffModulus::Create(poly_modulus_degree, { 36, 36, 36, 36, 37 }));
+        parms.set_coeff_modulus(CoeffModulus::Create(poly_modulus_degree, coeff_modulus_params));
 
         uint64_t plain_modulus_value = 1;
         if (scheme == scheme_type::ckks) {
@@ -48,7 +139,7 @@ int test_cpmm() {
         
         Encryptor encryptor(context, public_key);
         Decryptor decryptor(context, secret_key);
-        
+                
         size_t d = poly_modulus_degree;
         cout << "\n=== 测试参数 ===" << endl;
         cout << "多项式模数次数: " << d << endl;
@@ -104,7 +195,6 @@ int test_cpmm() {
         
         // 计算期望结果（明文计算）
         vector<vector<uint64_t>> expected_result;
-        // matrix_multiply_plain(plain_matrix_1, plain_matrix_2, expected_result, plain_modulus_value);
         matrix_multiply_plain_blas(plain_matrix_1, plain_matrix_2, expected_result, plain_modulus_value);
         
         print_matrix(expected_result, "期望结果矩阵");
@@ -131,14 +221,28 @@ int test_cpmm() {
 
 int test_ccmm() {
     try {
+        // 读取配置文件
+        json config = read_seal_config();
+        if (config.empty()) {
+            cerr << "无法读取配置文件，使用默认参数" << endl;
+            return 1;
+        }
+        
+        // 获取用户输入的多项式模数次数
+        size_t poly_modulus_degree = get_user_poly_modulus_degree(config);
+        
+        // 获取对应的系数模数参数
+        vector<int> coeff_modulus_params = get_coeff_modulus_params(config, poly_modulus_degree);
+        if (coeff_modulus_params.empty()) {
+            cerr << "无法获取系数模数参数" << endl;
+            return 1;
+        }
+        
         // 设置加密参数
         scheme_type scheme = scheme_type::bfv;
         EncryptionParameters parms(scheme);
-        size_t poly_modulus_degree = 4096;
         parms.set_poly_modulus_degree(poly_modulus_degree);
-        // parms.set_coeff_modulus(CoeffModulus::BFVDefault(poly_modulus_degree));
-        // Double can only represent 2^53-1, so we need to carefully design a new coeff_modulus for degree 8192
-        parms.set_coeff_modulus(CoeffModulus::Create(poly_modulus_degree, { 26, 26}));
+        parms.set_coeff_modulus(CoeffModulus::Create(poly_modulus_degree, coeff_modulus_params));
 
         uint64_t plain_modulus_value = 1;
         if (scheme == scheme_type::ckks) {
@@ -289,12 +393,28 @@ int test_ccmm() {
 
 int test_CMT() {
     try {
+        // 读取配置文件
+        json config = read_seal_config();
+        if (config.empty()) {
+            cerr << "无法读取配置文件，使用默认参数" << endl;
+            return 1;
+        }
+        
+        // 获取用户输入的多项式模数次数
+        size_t poly_modulus_degree = get_user_poly_modulus_degree(config);
+        
+        // 获取对应的系数模数参数
+        vector<int> coeff_modulus_params = get_coeff_modulus_params(config, poly_modulus_degree);
+        if (coeff_modulus_params.empty()) {
+            cerr << "无法获取系数模数参数" << endl;
+            return 1;
+        }
+        
         // 设置加密参数
         scheme_type scheme = scheme_type::bfv;
         EncryptionParameters parms(scheme);
-        size_t poly_modulus_degree = 4096;
         parms.set_poly_modulus_degree(poly_modulus_degree);
-        parms.set_coeff_modulus(CoeffModulus::BFVDefault(poly_modulus_degree));
+        parms.set_coeff_modulus(CoeffModulus::Create(poly_modulus_degree, coeff_modulus_params));
         parms.set_plain_modulus(PlainModulus::Batching(poly_modulus_degree, 20));
 
         SEALContext context(parms);
@@ -416,126 +536,57 @@ int test_CMT() {
 
 int test_function() {
     try {
-        // 设置加密参数
-        scheme_type scheme = scheme_type::bfv;
-        EncryptionParameters parms(scheme);
-        size_t poly_modulus_degree = 4096;
-        parms.set_poly_modulus_degree(poly_modulus_degree);
-        parms.set_coeff_modulus(CoeffModulus::BFVDefault(poly_modulus_degree));
-        parms.set_plain_modulus(PlainModulus::Batching(poly_modulus_degree, 20));
-
-        SEALContext context(parms);
-        print_parameters(context);
+        cout << "\n=== 测试BLAS浮点矩阵乘法性能 ===" << endl;
+        cout << "测试不同矩阵大小的BLAS矩阵乘法时间..." << endl;
         
-        // 生成密钥
-        KeyGenerator keygen(context);
-        SecretKey secret_key = keygen.secret_key();
-        PublicKey public_key;
-        keygen.create_public_key(public_key);
-        
-        // 生成Galois密钥（用于automorphism操作）
-        GaloisKeys galois_keys;
-        
-        // 为CM-T算法生成所需的Galois元素：2*t+1，其中t从0到N-1
-        vector<uint32_t> galois_elts;
-        for (size_t t = 0; t < poly_modulus_degree; t++) {
-            galois_elts.push_back(2 * t + 1);
-        }
-        keygen.create_galois_keys(galois_elts, galois_keys);
-        
-        Encryptor encryptor(context, public_key);
-        Decryptor decryptor(context, secret_key);
-        Evaluator evaluator(context);
-
-        cout << "\n=== 测试CM-T算法第二步：Galois Automorphism ===" << endl;
-        
-        // 创建测试向量
-        vector<uint64_t> original_vector(poly_modulus_degree);
-        for (size_t i = 0; i < poly_modulus_degree; i++) {
-            original_vector[i] = i; // 简单的测试数据
-        }
-        
-        cout << "原始向量（前10个元素）: ";
-        for (size_t i = 0; i < min(size_t(10), poly_modulus_degree); i++) {
-            cout << original_vector[i] << " ";
-        }
-        cout << endl;
-        
-        // 编码并加密向量
-        Plaintext plain_vector;
-        encode_vector_to_plaintext(original_vector, context, plain_vector);
-        Ciphertext encrypted_vector;
-        encryptor.encrypt(plain_vector, encrypted_vector);
-        cout << "向量加密完成" << endl;
-        
-        // 测试不同的Galois automorphism
-        size_t test_cases = 5; // 测试前5个case
-        cout << "\n测试前" << test_cases << "个Galois automorphism (2*t+1):" << endl;
-        
-        for (size_t t = 0; t < test_cases; t++) {
-            uint32_t galois_elt = 2 * t + 1;
-            cout << "\n--- 测试 t=" << t << ", Galois元素=" << galois_elt << " ---" << endl;
+        for (size_t d = 2048; d <= 16384; d *= 2) {
+            cout << "\n--- 测试矩阵大小: " << d << "x" << d << " ---" << endl;
             
-            // 复制原始密文
-            Ciphertext test_cipher = encrypted_vector;
+            // 创建d×d的浮点矩阵
+            vector<vector<double>> plain_matrix_1(d, vector<double>(d));
+            vector<vector<double>> plain_matrix_2(d, vector<double>(d));
+            vector<vector<double>> result_matrix(d, vector<double>(d));
             
-            // 应用Galois automorphism
-            evaluator.apply_galois_inplace(test_cipher, galois_elt, galois_keys);
-            cout << "Galois automorphism应用完成" << endl;
-            
-            // 解密并解码
-            Plaintext decrypted_plain;
-            decryptor.decrypt(test_cipher, decrypted_plain);
-            vector<uint64_t> transformed_vector;
-            decode_plaintext_to_vector(decrypted_plain, context, transformed_vector);
-            
-            cout << "变换后向量（前10个元素）: ";
-            for (size_t i = 0; i < min(size_t(10), poly_modulus_degree); i++) {
-                cout << transformed_vector[i] << " ";
+            // 初始化矩阵（简单的测试模式）
+            for (size_t i = 0; i < d; i++) {
+                for (size_t j = 0; j < d; j++) {
+                    plain_matrix_1[i][j] = static_cast<double>(rand() % 10);
+                    plain_matrix_2[i][j] = static_cast<double>(rand() % 10);
+                }
             }
-            cout << endl;
+
+            // 转换为BLAS格式（行主序）
+            vector<double> A_flat(d * d);
+            vector<double> B_flat(d * d);
+            vector<double> C_flat(d * d);
             
-
-        }
-        
-        // 测试CM-T算法第二步的完整流程
-        cout << "\n=== 测试CM-T算法第二步完整流程 ===" << endl;
-        
-        // 模拟tilde_m向量（这里我们使用相同的加密向量作为示例）
-        vector<Ciphertext> tilde_m(3); // 只测试前3个
-        for (size_t t = 0; t < 3; t++) {
-            tilde_m[t] = encrypted_vector; // 使用相同的向量作为示例
-        }
-        
-        // 执行CM-T算法第二步：bar_m_t = tilde_m_t(X^{2t+1})
-        vector<Ciphertext> bar_m(3);
-        for (size_t t = 0; t < 3; t++) {
-            bar_m[t] = tilde_m[t];
-            evaluator.apply_galois_inplace(bar_m[t], 2*t+1, galois_keys);
-            cout << "完成 bar_m[" << t << "] = tilde_m[" << t << "](X^{" << 2*t+1 << "})" << endl;
-        }
-        
-        // 验证所有bar_m都被正确创建
-        bool all_bar_m_valid = true;
-        for (size_t t = 0; t < 3; t++) {
-            try {
-                // 尝试解密每个bar_m，确保它们都是有效的密文
-                Plaintext test_plain;
-                decryptor.decrypt(bar_m[t], test_plain);
-                cout << "✓ bar_m[" << t << "] 解密成功" << endl;
-            } catch (const exception& e) {
-                cout << "✗ bar_m[" << t << "] 解密失败: " << e.what() << endl;
-                all_bar_m_valid = false;
+            for (size_t i = 0; i < d; i++) {
+                for (size_t j = 0; j < d; j++) {
+                    A_flat[i * d + j] = plain_matrix_1[i][j];
+                    B_flat[i * d + j] = plain_matrix_2[i][j];
+                }
             }
+
+            // 计时BLAS矩阵乘法
+            auto start_time = chrono::high_resolution_clock::now();
+            
+            // 执行BLAS矩阵乘法: C = A * B
+            cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
+                        d, d, d, 1.0,
+                        A_flat.data(), d,
+                        B_flat.data(), d, 0.0,
+                        C_flat.data(), d);
+            
+            auto end_time = chrono::high_resolution_clock::now();
+            auto blas_time = chrono::duration_cast<chrono::milliseconds>(end_time - start_time);
+
+            cout << "矩阵大小: " << d << "x" << d << endl;
+            cout << "BLAS矩阵乘法完成，耗时: " << blas_time.count() << " ms" << endl;
+            cout << "理论浮点运算次数: " << (2 * d * d * d) << " FLOPS" << endl;
+            cout << "性能: " << (2.0 * d * d * d / (blas_time.count() * 1e6)) << " GFLOPS" << endl;
         }
         
-        if (all_bar_m_valid) {
-            cout << "\n✓ CM-T算法第二步测试成功！所有Galois automorphism操作都正确执行。" << endl;
-        } else {
-            cout << "\n✗ CM-T算法第二步测试失败！" << endl;
-        }
-
-        cout << "\n=== 测试完成 ===" << endl;
+        cout << "\n=== BLAS浮点矩阵乘法性能测试完成 ===" << endl;
         
     } catch (const exception& e) {
         cerr << "错误: " << e.what() << endl;
@@ -583,13 +634,13 @@ int main() {
             }
         }
         else if (choice == "4") {
-            cout << "\n开始测试 CM-T算法第二步Galois Automorphism..." << endl;
+            cout << "\n开始测试 BLAS浮点矩阵乘法性能..." << endl;
             cout << "==========================================" << endl;
             int result = test_function();
             if (result == 0) {
-                cout << "\nCM-T算法第二步Galois Automorphism测试成功完成！" << endl;
+                cout << "\nBLAS浮点矩阵乘法性能测试成功完成！" << endl;
             } else {
-                cout << "\nCM-T算法第二步Galois Automorphism测试失败！" << endl;
+                cout << "\nBLAS浮点矩阵乘法性能测试失败！" << endl;
             }
         }
         else if (choice == "5") {
@@ -597,7 +648,7 @@ int main() {
             break;
         }
         else {
-            cout << "无效选择，请输入 1、2、3、4 或 5。" << endl;
+            cout << "无效选择，请输入 1、2、3、4、5。" << endl;
         }
         
         cout << "\n按回车键继续...";
