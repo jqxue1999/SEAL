@@ -57,7 +57,7 @@ int test_CMT();
  * 测试negacyclic_multiply_poly_mono_coeffmod的移位功能
  * @return 成功返回0，失败返回1
  */
-int test_function();
+void test_function();
 
 /**
  * 打印菜单选项

@@ -569,19 +569,21 @@ double matrix_multiply_plain_blas(
     vector<double> B_double(k * n);
     vector<double> C_double(m * n);
 
-    #pragma omp parallel for collapse(2)
-    for (size_t i = 0; i < m; ++i) {
-        for (size_t j = 0; j < k; ++j) {
-            A_double[i * k + j] = static_cast<double>(A[i][j]);
-        }
+    #pragma omp parallel
+    {
+        // A的转换
+        #pragma omp for collapse(2)
+        for (size_t i = 0; i < m; ++i)
+            for (size_t j = 0; j < k; ++j)
+                A_double[i * k + j] = static_cast<double>(A[i][j]);
+        
+        // B的转换
+        #pragma omp for collapse(2)
+        for (size_t i = 0; i < k; ++i)
+            for (size_t j = 0; j < n; ++j)
+                B_double[i * n + j] = static_cast<double>(B[i][j]);
     }
 
-    #pragma omp parallel for collapse(2)
-    for (size_t i = 0; i < k; ++i) {
-        for (size_t j = 0; j < n; ++j) {
-            B_double[i * n + j] = static_cast<double>(B[i][j]);
-        }
-    }
     auto convert_end = chrono::high_resolution_clock::now();
     convert_time = chrono::duration<double>(convert_end - convert_start);
 
@@ -611,12 +613,10 @@ double matrix_multiply_plain_blas(
     auto mod_start = chrono::high_resolution_clock::now();
     C.assign(m, vector<uint64_t>(n));
     Modulus mod_obj(modulus);
-    #pragma omp parallel for collapse(2)
-    for (size_t i = 0; i < m; ++i) {
-        for (size_t j = 0; j < n; ++j) {
+    #pragma omp for collapse(2)
+    for (size_t i = 0; i < m; ++i)
+        for (size_t j = 0; j < n; ++j)
             C[i][j] = util::barrett_reduce_64(C_int[i][j], mod_obj);
-        }
-    }
     auto mod_end = chrono::high_resolution_clock::now();
     mod_time = chrono::duration<double>(mod_end - mod_start);
 

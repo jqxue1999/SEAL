@@ -534,66 +534,55 @@ int test_CMT() {
     return 0;
 }
 
-int test_function() {
-    try {
-        cout << "\n=== 测试BLAS浮点矩阵乘法性能 ===" << endl;
-        cout << "测试不同矩阵大小的BLAS矩阵乘法时间..." << endl;
-        
-        for (size_t d = 2048; d <= 16384; d *= 2) {
-            cout << "\n--- 测试矩阵大小: " << d << "x" << d << " ---" << endl;
-            
-            // 创建d×d的浮点矩阵
-            vector<vector<double>> plain_matrix_1(d, vector<double>(d));
-            vector<vector<double>> plain_matrix_2(d, vector<double>(d));
-            vector<vector<double>> result_matrix(d, vector<double>(d));
-            
-            // 初始化矩阵（简单的测试模式）
-            for (size_t i = 0; i < d; i++) {
-                for (size_t j = 0; j < d; j++) {
-                    plain_matrix_1[i][j] = static_cast<double>(rand() % 10);
-                    plain_matrix_2[i][j] = static_cast<double>(rand() % 10);
-                }
-            }
+void test_function() {
+    using namespace std::chrono;
+    constexpr size_t N = 4096;
+    cout << "\n=== vector<vector<uint64_t>> 到 vector<double> 两种转换方式性能对比 ===" << endl;
+    cout << "矩阵大小: " << N << "x" << N << endl;
 
-            // 转换为BLAS格式（行主序）
-            vector<double> A_flat(d * d);
-            vector<double> B_flat(d * d);
-            vector<double> C_flat(d * d);
-            
-            for (size_t i = 0; i < d; i++) {
-                for (size_t j = 0; j < d; j++) {
-                    A_flat[i * d + j] = plain_matrix_1[i][j];
-                    B_flat[i * d + j] = plain_matrix_2[i][j];
-                }
-            }
+    // 生成测试数据
+    vector<vector<uint64_t>> A(N, vector<uint64_t>(N));
+    for (size_t i = 0; i < N; ++i)
+        for (size_t j = 0; j < N; ++j)
+            A[i][j] = rand() % 100;
 
-            // 计时BLAS矩阵乘法
-            auto start_time = chrono::high_resolution_clock::now();
-            
-            // 执行BLAS矩阵乘法: C = A * B
-            cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
-                        d, d, d, 1.0,
-                        A_flat.data(), d,
-                        B_flat.data(), d, 0.0,
-                        C_flat.data(), d);
-            
-            auto end_time = chrono::high_resolution_clock::now();
-            auto blas_time = chrono::duration_cast<chrono::milliseconds>(end_time - start_time);
+    // 方式1：直接for循环转换
+    cout << "\n方式1: 直接for循环转换为vector<double>..." << endl;
+    auto t1_start = high_resolution_clock::now();
+    vector<double> A_1(N * N);
+    for (size_t i = 0; i < N; ++i)
+        for (size_t j = 0; j < N; ++j)
+            A_1[i * N + j] = static_cast<double>(A[i][j]);
+    auto t1_end = high_resolution_clock::now();
+    auto t1 = duration_cast<milliseconds>(t1_end - t1_start).count();
+    cout << "耗时: " << t1 << " ms" << endl;
 
-            cout << "矩阵大小: " << d << "x" << d << endl;
-            cout << "BLAS矩阵乘法完成，耗时: " << blas_time.count() << " ms" << endl;
-            cout << "理论浮点运算次数: " << (2 * d * d * d) << " FLOPS" << endl;
-            cout << "性能: " << (2.0 * d * d * d / (blas_time.count() * 1e6)) << " GFLOPS" << endl;
-        }
-        
-        cout << "\n=== BLAS浮点矩阵乘法性能测试完成 ===" << endl;
-        
-    } catch (const exception& e) {
-        cerr << "错误: " << e.what() << endl;
-        return 1;
-    }
+    // 方式2：先展开为一维再用构造函数
+    cout << "\n方式2: 先展开为vector<uint64_t>再用构造函数转换为vector<double>..." << endl;
+    auto t2_start = high_resolution_clock::now();
     
-    return 0;
+    // 步骤2a：展开为vector<uint64_t>
+    auto t2a_start = high_resolution_clock::now();
+    vector<uint64_t> A_flat;
+    A_flat.reserve(N * N);
+    for (const auto& row : A) A_flat.insert(A_flat.end(), row.begin(), row.end());
+    auto t2a_end = high_resolution_clock::now();
+    auto t2a = duration_cast<milliseconds>(t2a_end - t2a_start).count();
+    cout << "  步骤2a (展开为vector<uint64_t>): " << t2a << " ms" << endl;
+    
+    // 步骤2b：用构造函数转换为vector<double>
+    auto t2b_start = high_resolution_clock::now();
+    vector<double> A_2(A_flat.begin(), A_flat.end());
+    auto t2b_end = high_resolution_clock::now();
+    auto t2b = duration_cast<milliseconds>(t2b_end - t2b_start).count();
+    cout << "  步骤2b (构造函数转换为vector<double>): " << t2b << " ms" << endl;
+    
+    auto t2_end = high_resolution_clock::now();
+    auto t2 = duration_cast<milliseconds>(t2_end - t2_start).count();
+    cout << "  方式2总耗时: " << t2 << " ms" << endl;
+
+    cout << "\n方式1/方式2的A_1[0] = " << A_1[0] << ", A_2[0] = " << A_2[0] << endl;
+    cout << "\n=== 性能对比结束 ===" << endl;
 }
 
 int main() {
@@ -636,12 +625,7 @@ int main() {
         else if (choice == "4") {
             cout << "\n开始测试 BLAS浮点矩阵乘法性能..." << endl;
             cout << "==========================================" << endl;
-            int result = test_function();
-            if (result == 0) {
-                cout << "\nBLAS浮点矩阵乘法性能测试成功完成！" << endl;
-            } else {
-                cout << "\nBLAS浮点矩阵乘法性能测试失败！" << endl;
-            }
+            test_function();
         }
         else if (choice == "5") {
             cout << "程序退出。" << endl;
