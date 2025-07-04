@@ -11,6 +11,10 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 find_package(BLAS REQUIRED)
 find_package(OpenMP REQUIRED)
 
+# Enable AVX2 optimization
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mavx2 -mfma -march=native -mtune=native")
+message(STATUS "AVX2 optimization enabled: -mavx2 -mfma -march=native -mtune=native")
+
 # Find nlohmann/json library
 find_package(nlohmann_json 3.2.0 REQUIRED)
 message(STATUS "Found nlohmann/json")
