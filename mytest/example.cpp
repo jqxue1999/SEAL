@@ -178,6 +178,9 @@ int test_cpmm() {
         
         bool success = ciphertext_plaintext_matrix_multiply(
             context, plain_matrix_1, encrypted_matrix_2, result_matrix);
+
+        bool success_2 = ciphertext_plaintext_matrix_multiply(
+            context, plain_matrix_1, encrypted_matrix_2, result_matrix);
         
         auto end_time = chrono::high_resolution_clock::now();
         auto duration = chrono::duration_cast<chrono::milliseconds>(end_time - start_time);
@@ -195,7 +198,7 @@ int test_cpmm() {
         
         // 计算期望结果（明文计算）
         vector<vector<uint64_t>> expected_result;
-        matrix_multiply_plain_blas(plain_matrix_1, plain_matrix_2, expected_result, plain_modulus_value);
+        matrix_multiply_plain_blas(plain_matrix_1, plain_matrix_2, expected_result);
         
         print_matrix(expected_result, "期望结果矩阵");
         

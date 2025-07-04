@@ -1,18 +1,12 @@
 #include "cpmm.h"
 
-// AVX相关头文件
-#ifdef __AVX2__
-#include <immintrin.h>
-#endif
-
-using namespace seal;
-using namespace std;
-
 // AVX辅助函数：将uint64_t数组转换为double数组
 #ifdef __AVX2__
 void convert_uint64_to_double_avx(const uint64_t* src, double* dst, size_t size) {
     size_t vec_size = size / 4 * 4; // 处理4个元素一组
     
+    // 并行处理AVX向量化部分
+    #pragma omp parallel for
     for (size_t i = 0; i < vec_size; i += 4) {
         // 加载4个uint64_t
         __m256i uint64_vec = _mm256_loadu_si256((__m256i*)(src + i));
@@ -22,17 +16,20 @@ void convert_uint64_to_double_avx(const uint64_t* src, double* dst, size_t size)
         __m128i high = _mm256_extracti128_si256(uint64_vec, 1);
         
         // 使用标量转换，因为_mm_cvtepi64_pd需要AVX-512
-        for (int j = 0; j < 2; ++j) {
-            int64_t low_val = _mm_extract_epi64(low, j);
-            dst[i + j] = static_cast<double>(low_val);
-        }
-        for (int j = 0; j < 2; ++j) {
-            int64_t high_val = _mm_extract_epi64(high, j);
-            dst[i + 2 + j] = static_cast<double>(high_val);
-        }
+        // 必须使用编译时常量作为选择器
+        int64_t low_val_0 = _mm_extract_epi64(low, 0);
+        int64_t low_val_1 = _mm_extract_epi64(low, 1);
+        dst[i + 0] = static_cast<double>(low_val_0);
+        dst[i + 1] = static_cast<double>(low_val_1);
+        
+        int64_t high_val_0 = _mm_extract_epi64(high, 0);
+        int64_t high_val_1 = _mm_extract_epi64(high, 1);
+        dst[i + 2] = static_cast<double>(high_val_0);
+        dst[i + 3] = static_cast<double>(high_val_1);
     }
     
-    // 处理剩余元素
+    // 并行处理剩余元素
+    #pragma omp parallel for
     for (size_t i = vec_size; i < size; ++i) {
         dst[i] = static_cast<double>(src[i]);
     }
@@ -41,6 +38,8 @@ void convert_uint64_to_double_avx(const uint64_t* src, double* dst, size_t size)
 void convert_double_to_uint64_avx(const double* src, uint64_t* dst, size_t size) {
     size_t vec_size = size / 4 * 4;
     
+    // 并行处理AVX向量化部分
+    #pragma omp parallel for
     for (size_t i = 0; i < vec_size; i += 4) {
         // 加载4个double
         __m256d double_vec = _mm256_loadu_pd(src + i);
@@ -55,7 +54,8 @@ void convert_double_to_uint64_avx(const double* src, uint64_t* dst, size_t size)
         }
     }
     
-    // 处理剩余元素
+    // 并行处理剩余元素
+    #pragma omp parallel for
     for (size_t i = vec_size; i < size; ++i) {
         dst[i] = static_cast<uint64_t>(src[i]);
     }
@@ -644,6 +644,7 @@ double matrix_multiply_plain_blas(
             convert_uint64_to_double_avx(B[i].data(), B_double.data() + i * n, n);
         }
         #else
+        cout << "使用原始转换方法" << endl;
         // 原始转换方法（作为fallback）
         #pragma omp for collapse(2)
         for (size_t i = 0; i < m; ++i)
@@ -676,18 +677,24 @@ double matrix_multiply_plain_blas(
     
     #ifdef __AVX2__
     // 使用AVX优化的转换
-    #pragma omp parallel for
-    for (size_t i = 0; i < m; ++i) {
-        convert_double_to_uint64_avx(C_double.data() + i * n, C_int[i].data(), n);
+    #pragma omp parallel
+    {
+        #pragma omp for
+        for (size_t i = 0; i < m; ++i) {
+            convert_double_to_uint64_avx(C_double.data() + i * n, C_int[i].data(), n);
+        }
     }
     #else
     // 原始转换方法（作为fallback）
+    cout << "使用原始转换方法" << endl;
+
     #pragma omp parallel for collapse(2)
     for (size_t i = 0; i < m; ++i) {
         for (size_t j = 0; j < n; ++j) {
             C_int[i][j] = static_cast<uint64_t>(C_double[i * n + j]);
         }
     }
+
     #endif
     auto convert_end2 = chrono::high_resolution_clock::now();
     convert_time += chrono::duration<double>(convert_end2 - convert_start2);
@@ -696,14 +703,118 @@ double matrix_multiply_plain_blas(
     auto mod_start = chrono::high_resolution_clock::now();
     C.assign(m, vector<uint64_t>(n));
     Modulus mod_obj(modulus);
-    #pragma omp for collapse(2)
-    for (size_t i = 0; i < m; ++i)
-        for (size_t j = 0; j < n; ++j)
-            C[i][j] = util::barrett_reduce_64(C_int[i][j], mod_obj);
+    #pragma omp parallel
+    {
+        #pragma omp for collapse(2)
+        for (size_t i = 0; i < m; ++i) {
+            for (size_t j = 0; j < n; ++j)
+                C[i][j] = util::barrett_reduce_64(C_int[i][j], mod_obj);
+        }
+    }
     auto mod_end = chrono::high_resolution_clock::now();
     mod_time = chrono::duration<double>(mod_end - mod_start);
 
     cout << "convert_time: " << convert_time.count() << " | blas_time: " << blas_time.count() << " | mod_time: " << mod_time.count() << endl;
 
     return convert_time.count() + blas_time.count() + mod_time.count();
+}
+
+
+double matrix_multiply_plain_blas(
+    const vector<vector<uint64_t>>& A,
+    const vector<vector<uint64_t>>& B,
+    vector<vector<uint64_t>>& C)
+{
+    chrono::duration<double> convert_time(0);
+    chrono::duration<double> blas_time(0);
+    
+    size_t m = A.size();
+    if (m == 0) return 0;
+    size_t k = A[0].size();
+    if (B.size() != k) {
+        cerr << "Matrix dimensions do not match for multiplication." << endl;
+        return 0;
+    }
+    size_t n = B[0].size();
+
+    // 转换为 double 数组
+    auto convert_start = chrono::high_resolution_clock::now();
+    vector<double> A_double(m * k);
+    vector<double> B_double(k * n);
+    vector<double> C_double(m * n);
+
+    #pragma omp parallel
+    {
+        #ifdef __AVX2__
+        // 使用AVX优化的转换
+        #pragma omp for
+        for (size_t i = 0; i < m; ++i) {
+            // 将A的第i行转换为double数组
+            convert_uint64_to_double_avx(A[i].data(), A_double.data() + i * k, k);
+        }
+        
+        #pragma omp for
+        for (size_t i = 0; i < k; ++i) {
+            // 将B的第i行转换为double数组
+            convert_uint64_to_double_avx(B[i].data(), B_double.data() + i * n, n);
+        }
+        #else
+        cout << "使用原始转换方法" << endl;
+        // 原始转换方法（作为fallback）
+        #pragma omp for collapse(2)
+        for (size_t i = 0; i < m; ++i)
+            for (size_t j = 0; j < k; ++j)
+                A_double[i * k + j] = static_cast<double>(A[i][j]);
+        
+        #pragma omp for collapse(2)
+        for (size_t i = 0; i < k; ++i)
+            for (size_t j = 0; j < n; ++j)
+                B_double[i * n + j] = static_cast<double>(B[i][j]);
+        #endif
+    }
+
+    auto convert_end = chrono::high_resolution_clock::now();
+    convert_time = chrono::duration<double>(convert_end - convert_start);
+
+    // 执行 BLAS 矩阵乘法
+    auto blas_start = chrono::high_resolution_clock::now();
+    cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
+                m, n, k, 1.0,
+                A_double.data(), k,
+                B_double.data(), n, 0.0,
+                C_double.data(), n);
+    auto blas_end = chrono::high_resolution_clock::now();
+    blas_time = chrono::duration<double>(blas_end - blas_start);
+
+    // 先转换为uint64_t，统计到convert_time
+    auto convert_start2 = chrono::high_resolution_clock::now();
+    C.assign(m, vector<uint64_t>(n));
+    
+    #ifdef __AVX2__
+    // 使用AVX优化的转换
+    #pragma omp parallel
+    {
+        #pragma omp for
+        for (size_t i = 0; i < m; ++i) {
+            convert_double_to_uint64_avx(C_double.data() + i * n, C[i].data(), n);
+        }
+    }
+    #else
+    // 原始转换方法（作为fallback）
+    cout << "使用原始转换方法" << endl;
+
+    #pragma omp parallel for collapse(2)
+    for (size_t i = 0; i < m; ++i) {
+        for (size_t j = 0; j < n; ++j) {
+            C[i][j] = static_cast<uint64_t>(C_double[i * n + j]);
+        }
+    }
+
+    #endif
+    auto convert_end2 = chrono::high_resolution_clock::now();
+    convert_time += chrono::duration<double>(convert_end2 - convert_start2);
+
+    cout << "convert_time: " << convert_time.count() << " | blas_time: " << blas_time.count() << endl;
+
+    return convert_time.count() + blas_time.count();
 }

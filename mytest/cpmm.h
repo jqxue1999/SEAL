@@ -18,6 +18,13 @@
 #include <cblas.h>
 #include <cassert>
 
+// AVX相关头文件
+#ifdef __AVX2__
+#include <immintrin.h>
+#endif
+
+#include <omp.h>
+
 using namespace seal;
 using namespace std;
 
@@ -135,6 +142,11 @@ double matrix_multiply_plain_blas(
     const vector<vector<uint64_t>>& B,
     vector<vector<uint64_t>>& C,
     uint64_t modulus);
+
+double matrix_multiply_plain_blas(
+    const vector<vector<uint64_t>>& A,
+    const vector<vector<uint64_t>>& B,
+    vector<vector<uint64_t>>& C);
 
 
 /**
