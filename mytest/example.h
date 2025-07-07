@@ -3,6 +3,7 @@
 
 #include "cpmm.h"
 #include "ccmm.h"
+#include "digits.h"
 #include <iostream>
 #include <string>
 #include <vector>
@@ -58,6 +59,12 @@ int test_CMT();
  * @return 成功返回0，失败返回1
  */
 void test_function();
+
+/**
+ * 测试通用向量乘法功能
+ * @return 成功返回0，失败返回1
+ */
+int test_general_multiplication();
 
 /**
  * 打印菜单选项

@@ -89,8 +89,9 @@ void print_menu() {
     cout << "2. CCMM (Ciphertext-Ciphertext Matrix Multiplication) - 密文-密文矩阵乘法" << endl;
     cout << "3. CMT (Ciphertext Matrix Transpose) - 密文矩阵转置" << endl;
     cout << "4. BLAS Performance Test - 测试BLAS浮点矩阵乘法性能" << endl;
-    cout << "5. 退出程序" << endl;
-    cout << "请输入选择 (1-5): ";
+    cout << "5. General Multiplication & Carry Recovery - 通用乘法和进位恢复" << endl;
+    cout << "6. 退出程序" << endl;
+    cout << "请输入选择 (1-6): ";
 }
 
 int test_cpmm() {
@@ -537,6 +538,117 @@ int test_CMT() {
     return 0;
 }
 
+int test_general_multiplication() {
+    try {
+        // 读取配置文件
+        json config = read_seal_config();
+        if (config.empty()) {
+            cerr << "无法读取配置文件，使用默认参数" << endl;
+            return 1;
+        }
+        
+        // 获取用户输入的多项式模数次数
+        size_t poly_modulus_degree = get_user_poly_modulus_degree(config);
+        
+        // 获取对应的系数模数参数
+        vector<int> coeff_modulus_params = get_coeff_modulus_params(config, poly_modulus_degree);
+        if (coeff_modulus_params.empty()) {
+            cerr << "无法获取系数模数参数" << endl;
+            return 1;
+        }
+        
+        // 设置加密参数
+        scheme_type scheme = scheme_type::bfv;
+        EncryptionParameters parms(scheme);
+        parms.set_poly_modulus_degree(poly_modulus_degree);
+        parms.set_coeff_modulus(CoeffModulus::Create(poly_modulus_degree, coeff_modulus_params));
+
+        uint64_t plain_modulus_value = 1;
+        if (scheme == scheme_type::ckks) {
+            for (const auto &mod : parms.coeff_modulus())
+                plain_modulus_value *= mod.value();
+        } else {
+            parms.set_plain_modulus(PlainModulus::Batching(poly_modulus_degree, 20));
+            plain_modulus_value = parms.plain_modulus().value();            
+        }
+
+        SEALContext context(parms);
+        print_parameters(context);
+        
+        // 生成密钥
+        KeyGenerator keygen(context);
+        SecretKey secret_key = keygen.secret_key();
+        PublicKey public_key;
+        keygen.create_public_key(public_key);
+        
+        Encryptor encryptor(context, public_key);
+        Decryptor decryptor(context, secret_key);
+        Evaluator evaluator(context);
+        
+        cout << "\n=== 测试参数 ===" << endl;
+        cout << "多项式模数次数: " << poly_modulus_degree << endl;
+        cout << "系数模数层数: " << parms.coeff_modulus().size() << endl;
+        cout << "位数: 64" << endl;
+        
+        // 创建测试向量
+        cout << "\n=== 创建测试向量 ===" << endl;
+        vector<uint64_t> input_vector(poly_modulus_degree);
+        
+        // 初始化测试向量（使用随机值）
+        for (size_t i = 0; i < poly_modulus_degree; i++) {
+            // 生成0到100之间的随机整数
+            input_vector[i] = rand() % 101;
+        }
+        
+        cout << "输入向量大小: " << input_vector.size() << endl;
+        cout << "前10个元素: ";
+        for (size_t i = 0; i < min(size_t(10), input_vector.size()); i++) {
+            cout << input_vector[i] << " ";
+        }
+        cout << endl;
+        
+        // 测试不同的乘数
+        vector<uint64_t> test_multipliers = {2, 3, 4, 7, 8, 13, 16, 25, 32, 50, 64, 100, 128};
+        
+        for (uint64_t multiplier : test_multipliers) {
+            cout << "\n=== 测试乘以" << multiplier << " ===" << endl;
+            
+            // 加密输入向量
+            vector<vector<uint64_t>> bit_vectors;
+            decompose_to_bit_vectors(input_vector, bit_vectors);
+            vector<Ciphertext> encrypted_bit_vectors;
+            encrypt_bit_vectors(context, encryptor, bit_vectors, encrypted_bit_vectors);
+
+            // 乘以乘数
+            vector<Ciphertext> result_vectors;
+            multiply_by_general_scalar(context, encryptor, evaluator, encrypted_bit_vectors, multiplier, result_vectors);
+            
+            // 解密并验证结果
+            vector<vector<uint64_t>> decrypted_bit_vectors;
+            decrypt_bit_vectors(context, decryptor, result_vectors, decrypted_bit_vectors);
+            vector<uint64_t> output_vector;
+            compose_from_bit_vectors(decrypted_bit_vectors, output_vector);
+            
+            bool verify_success = verify_general_multiplication(input_vector, multiplier, output_vector);
+            
+            if (!verify_success) {
+                cerr << "验证失败！" << endl;
+                return 1;
+            }
+            
+            cout << "✓ 乘以" << multiplier << "测试成功！" << endl;
+        }
+        
+        cout << "\n=== 通用向量乘法测试完成 ===" << endl;
+        
+    } catch (const exception& e) {
+        cerr << "错误: " << e.what() << endl;
+        return 1;
+    }
+    
+    return 0;
+}
+
 void test_function() {
     using namespace std::chrono;
     constexpr size_t N = 4096;
@@ -631,11 +743,21 @@ int main() {
             test_function();
         }
         else if (choice == "5") {
+            cout << "\n开始自定义位数测试..." << endl;
+            cout << "==========================================" << endl;
+            
+            int result = test_general_multiplication();
+            if (result == 0)
+                cout << "\n64位通用乘法测试成功完成！" << endl;
+            else
+                cout << "\n64位通用乘法测试失败！" << endl;
+        }
+        else if (choice == "6") {
             cout << "程序退出。" << endl;
             break;
         }
         else {
-            cout << "无效选择，请输入 1、2、3、4、5。" << endl;
+            cout << "无效选择，请输入 1、2、3、4、5、6。" << endl;
         }
         
         cout << "\n按回车键继续...";

@@ -56,6 +56,7 @@ if(SEAL_BUILD_EXAMPLES)
             ${CMAKE_CURRENT_LIST_DIR}/example.cpp
             ${CMAKE_CURRENT_LIST_DIR}/cpmm.cpp
             ${CMAKE_CURRENT_LIST_DIR}/ccmm.cpp
+            ${CMAKE_CURRENT_LIST_DIR}/digits.cpp
             ${CMAKE_CURRENT_LIST_DIR}/utils.cpp
     )
 
