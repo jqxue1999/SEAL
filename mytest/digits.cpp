@@ -189,37 +189,16 @@ void multiply_by_power_of_2(
 
 vector<int> decompose_to_powers_of_2(uint64_t value) {
     vector<int> powers;
-    
-    if (value == 0) {
-        return powers;
-    }
-    
-    // 预分配空间以避免动态扩容
-    powers.reserve(64);
-    
-    // 使用OpenMP并行化位检查
-    #pragma omp parallel
-    {
-        vector<int> local_powers;
-        local_powers.reserve(64);
-        
-        #pragma omp for
-        for (int bit = 0; bit < 64; bit++) {
-            if (value & (1ULL << bit)) {
-                local_powers.push_back(bit);
-            }
+    int exponent = 0;
+
+    while (value > 0) {
+        if ((value & 1) == 1) {
+            powers.push_back(exponent);
         }
-        
-        // 合并结果
-        #pragma omp critical
-        {
-            powers.insert(powers.end(), local_powers.begin(), local_powers.end());
-        }
+        value >>= 1;
+        exponent++;
     }
-    
-    // 对结果排序以确保顺序一致
-    sort(powers.begin(), powers.end());
-    
+
     return powers;
 }
 
@@ -248,42 +227,61 @@ void multiply_by_general_scalar(
     auto end = chrono::high_resolution_clock::now();
     auto step_1_duration = chrono::duration_cast<chrono::microseconds>(end - start);
     
-    // 初始化结果向量为全零
+    // 初始化全零密文（只在需要时用）
     start = chrono::high_resolution_clock::now();
     auto context_data = context.get_context_data(context.first_parms_id());
     size_t poly_modulus_degree = context_data->parms().poly_modulus_degree();
     vector<uint64_t> zero_vector(poly_modulus_degree, 0);
     Plaintext zero_plaintext;
     encode_vector_to_plaintext(zero_vector, context, zero_plaintext);
-    
     Ciphertext zero_ciphertext;
     encryptor.encrypt(zero_plaintext, zero_ciphertext);
     end = chrono::high_resolution_clock::now();
     auto step_2_duration = chrono::duration_cast<chrono::microseconds>(end - start);
     
-    // 初始化结果向量
     start = chrono::high_resolution_clock::now();
     result_vectors.resize(64);
-    for (int bit = 0; bit < 64; bit++)
-        result_vectors[bit] = zero_ciphertext;
-    
-    // 对于每个目标位，计算所有源位的贡献
-    #pragma omp parallel for schedule(dynamic)
-    for (int target_bit = 0; target_bit < 64; target_bit++) {
-        // 计算所有幂次对这个目标位的贡献
-        for (int power : powers) {
-            int source_bit = target_bit - power;
+    if (powers.empty()) {
+        // multiplier为0，全部置零
+        for (int bit = 0; bit < 64; bit++)
+            result_vectors[bit] = zero_ciphertext;
+        end = chrono::high_resolution_clock::now();
+        auto step_3_duration = chrono::duration_cast<chrono::microseconds>(end - start);
+        cout << "乘以" << multiplier << "操作完成！耗时: " << step_1_duration.count() << " + " 
+        << step_2_duration.count() << " + " << step_3_duration.count() << " = " << 
+        step_1_duration.count() + step_2_duration.count() + step_3_duration.count() << " microseconds" << endl;
+        cout << "add_inplace 操作次数: 0" << endl;
+    } else {
+        int p_min = *min_element(powers.begin(), powers.end());
+        for (int target_bit = 0; target_bit < 64; target_bit++) {
+            int source_bit = target_bit - p_min;
             if (source_bit >= 0 && source_bit < 64) {
-                evaluator.add_inplace(result_vectors[target_bit], encrypted_bit_vectors[source_bit]);
+                result_vectors[target_bit] = encrypted_bit_vectors[source_bit];
+            } else {
+                result_vectors[target_bit] = zero_ciphertext;
             }
         }
+        // 对剩下的 powers 做 add_inplace
+        int number_of_add_inplace = 0;
+        for (int target_bit = 0; target_bit < 64; target_bit++) {
+            for (int power : powers) {
+                if (power == p_min) continue;
+                int source_bit2 = target_bit - power;
+                if (source_bit2 >= 0 && source_bit2 < 64) {
+                    evaluator.add_inplace(result_vectors[target_bit], encrypted_bit_vectors[source_bit2]);
+                    number_of_add_inplace++;
+                }
+            }
+        }
+        end = chrono::high_resolution_clock::now();
+        auto step_3_duration = chrono::duration_cast<chrono::microseconds>(end - start);
+        cout << "乘以" << multiplier << "操作完成！耗时: " << step_1_duration.count() << " + " 
+        << step_2_duration.count() << " + " << step_3_duration.count() << " = " << 
+        step_1_duration.count() + step_2_duration.count() + step_3_duration.count() << " microseconds" << endl;
+        cout << "add_inplace 操作次数: " << number_of_add_inplace << endl;
     }
     
-    end = chrono::high_resolution_clock::now();
-    auto step_3_duration = chrono::duration_cast<chrono::microseconds>(end - start);
-    cout << "乘以" << multiplier << "操作完成！耗时: " << step_1_duration.count() << " + " 
-    << step_2_duration.count() << " + " << step_3_duration.count() << " = " << 
-    step_1_duration.count() + step_2_duration.count() + step_3_duration.count() << " microseconds" << endl;
+    return;
 }
 
 bool verify_general_multiplication(

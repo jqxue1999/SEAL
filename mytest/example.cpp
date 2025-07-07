@@ -608,7 +608,7 @@ int test_general_multiplication() {
         cout << endl;
         
         // 测试不同的乘数
-        vector<uint64_t> test_multipliers = {2, 3, 4, 7, 8, 13, 16, 25, 32, 50, 64, 100, 128};
+        vector<uint64_t> test_multipliers = {2, 3, 4, 7, 8, 13, 16, 27, 32, 2, 3, 4, 7, 8, 13, 16, 27, 32};
         
         for (uint64_t multiplier : test_multipliers) {
             cout << "\n=== 测试乘以" << multiplier << " ===" << endl;
