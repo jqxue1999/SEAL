@@ -32,7 +32,8 @@ using namespace std;
  */
 void decompose_to_bit_vectors(
     const vector<uint64_t>& input_vector,
-    vector<vector<uint64_t>>& bit_vectors);
+    vector<vector<uint64_t>>& bit_vectors,
+    int num_bits = 64);
 
 /**
  * 将位级向量重新组合为整数向量
@@ -42,7 +43,8 @@ void decompose_to_bit_vectors(
  */
 void compose_from_bit_vectors(
     const vector<vector<uint64_t>>& bit_vectors,
-    vector<uint64_t>& output_vector);
+    vector<uint64_t>& output_vector,
+    int num_bits = 64);
 
 /**
  * 加密位级向量
@@ -56,7 +58,8 @@ void encrypt_bit_vectors(
     const SEALContext& context,
     Encryptor& encryptor,
     const vector<vector<uint64_t>>& bit_vectors,
-    vector<Ciphertext>& encrypted_bit_vectors);
+    vector<Ciphertext>& encrypted_bit_vectors,
+    int num_bits = 64);
 
 /**
  * 解密位级向量
@@ -70,7 +73,8 @@ void decrypt_bit_vectors(
     const SEALContext& context,
     Decryptor& decryptor,
     const vector<Ciphertext>& encrypted_bit_vectors,
-    vector<vector<uint64_t>>& decrypted_bit_vectors);
+    vector<vector<uint64_t>>& decrypted_bit_vectors,
+    int num_bits = 64);
 
 /**
  * 对加密的位级向量执行乘以2的幂次方操作
@@ -87,7 +91,8 @@ void multiply_by_power_of_2(
     Encryptor& encryptor,
     const vector<Ciphertext>& encrypted_bit_vectors,
     int power,
-    vector<Ciphertext>& result_vectors);
+    vector<Ciphertext>& result_vectors,
+    int num_bits = 64);
 
 /**
  * 将整数分解为2的幂次方之和
@@ -114,7 +119,8 @@ void multiply_by_general_scalar(
     Evaluator& evaluator,
     const vector<Ciphertext>& encrypted_bit_vectors,
     uint64_t multiplier,
-    vector<Ciphertext>& result_vectors);
+    vector<Ciphertext>& result_vectors,
+    int num_bits = 64);
 
 /**
  * 验证通用向量乘法的正确性

@@ -538,7 +538,7 @@ int test_CMT() {
     return 0;
 }
 
-int test_general_multiplication() {
+int test_general_multiplication(int num_bits) {
     try {
         // 读取配置文件
         json config = read_seal_config();
@@ -546,23 +546,19 @@ int test_general_multiplication() {
             cerr << "无法读取配置文件，使用默认参数" << endl;
             return 1;
         }
-        
         // 获取用户输入的多项式模数次数
         size_t poly_modulus_degree = get_user_poly_modulus_degree(config);
-        
         // 获取对应的系数模数参数
         vector<int> coeff_modulus_params = get_coeff_modulus_params(config, poly_modulus_degree);
         if (coeff_modulus_params.empty()) {
             cerr << "无法获取系数模数参数" << endl;
             return 1;
         }
-        
         // 设置加密参数
         scheme_type scheme = scheme_type::bfv;
         EncryptionParameters parms(scheme);
         parms.set_poly_modulus_degree(poly_modulus_degree);
         parms.set_coeff_modulus(CoeffModulus::Create(poly_modulus_degree, coeff_modulus_params));
-
         uint64_t plain_modulus_value = 1;
         if (scheme == scheme_type::ckks) {
             for (const auto &mod : parms.coeff_modulus())
@@ -571,81 +567,57 @@ int test_general_multiplication() {
             parms.set_plain_modulus(PlainModulus::Batching(poly_modulus_degree, 20));
             plain_modulus_value = parms.plain_modulus().value();            
         }
-
         SEALContext context(parms);
         print_parameters(context);
-        
         // 生成密钥
         KeyGenerator keygen(context);
         SecretKey secret_key = keygen.secret_key();
         PublicKey public_key;
         keygen.create_public_key(public_key);
-        
         Encryptor encryptor(context, public_key);
         Decryptor decryptor(context, secret_key);
         Evaluator evaluator(context);
-        
         cout << "\n=== 测试参数 ===" << endl;
         cout << "多项式模数次数: " << poly_modulus_degree << endl;
         cout << "系数模数层数: " << parms.coeff_modulus().size() << endl;
-        cout << "位数: 64" << endl;
-        
+        cout << "位数: " << num_bits << endl;
         // 创建测试向量
         cout << "\n=== 创建测试向量 ===" << endl;
         vector<uint64_t> input_vector(poly_modulus_degree);
-        
-        // 初始化测试向量（使用随机值）
         for (size_t i = 0; i < poly_modulus_degree; i++) {
-            // 生成0到100之间的随机整数
-            input_vector[i] = rand() % 101;
+            input_vector[i] = rand() % 8;
         }
-        
         cout << "输入向量大小: " << input_vector.size() << endl;
         cout << "前10个元素: ";
         for (size_t i = 0; i < min(size_t(10), input_vector.size()); i++) {
             cout << input_vector[i] << " ";
         }
         cout << endl;
-        
-        // 测试不同的乘数
-        vector<uint64_t> test_multipliers = {2, 3, 4, 7, 8, 13, 16, 27, 32, 2, 3, 4, 7, 8, 13, 16, 27, 32};
-        
+        vector<uint64_t> test_multipliers = {2, 3, 4, 7, 8, 13, 16, 27, 32};
         for (uint64_t multiplier : test_multipliers) {
             cout << "\n=== 测试乘以" << multiplier << " ===" << endl;
-            
-            // 加密输入向量
             vector<vector<uint64_t>> bit_vectors;
-            decompose_to_bit_vectors(input_vector, bit_vectors);
+            decompose_to_bit_vectors(input_vector, bit_vectors, num_bits);
             vector<Ciphertext> encrypted_bit_vectors;
-            encrypt_bit_vectors(context, encryptor, bit_vectors, encrypted_bit_vectors);
-
-            // 乘以乘数
+            encrypt_bit_vectors(context, encryptor, bit_vectors, encrypted_bit_vectors, num_bits);
             vector<Ciphertext> result_vectors;
-            multiply_by_general_scalar(context, encryptor, evaluator, encrypted_bit_vectors, multiplier, result_vectors);
-            
-            // 解密并验证结果
+            multiply_by_general_scalar(context, encryptor, evaluator, encrypted_bit_vectors, multiplier, result_vectors, num_bits);
             vector<vector<uint64_t>> decrypted_bit_vectors;
-            decrypt_bit_vectors(context, decryptor, result_vectors, decrypted_bit_vectors);
+            decrypt_bit_vectors(context, decryptor, result_vectors, decrypted_bit_vectors, num_bits);
             vector<uint64_t> output_vector;
-            compose_from_bit_vectors(decrypted_bit_vectors, output_vector);
-            
+            compose_from_bit_vectors(decrypted_bit_vectors, output_vector, num_bits);
             bool verify_success = verify_general_multiplication(input_vector, multiplier, output_vector);
-            
             if (!verify_success) {
                 cerr << "验证失败！" << endl;
                 return 1;
             }
-            
             cout << "✓ 乘以" << multiplier << "测试成功！" << endl;
         }
-        
         cout << "\n=== 通用向量乘法测试完成 ===" << endl;
-        
     } catch (const exception& e) {
         cerr << "错误: " << e.what() << endl;
         return 1;
     }
-    
     return 0;
 }
 
@@ -746,11 +718,15 @@ int main() {
             cout << "\n开始自定义位数测试..." << endl;
             cout << "==========================================" << endl;
             
-            int result = test_general_multiplication();
+            int num_bits = 64;
+            cout << "请输入要测试的bit宽度（如8、16、32、64等）: ";
+            cin >> num_bits;
+            cin.ignore();
+            int result = test_general_multiplication(num_bits);
             if (result == 0)
-                cout << "\n64位通用乘法测试成功完成！" << endl;
+                cout << "\n通用乘法测试成功完成！（bit宽度=" << num_bits << ")" << endl;
             else
-                cout << "\n64位通用乘法测试失败！" << endl;
+                cout << "\n通用乘法测试失败！（bit宽度=" << num_bits << ")" << endl;
         }
         else if (choice == "6") {
             cout << "程序退出。" << endl;

@@ -64,7 +64,7 @@ void test_function();
  * 测试通用向量乘法功能
  * @return 成功返回0，失败返回1
  */
-int test_general_multiplication();
+int test_general_multiplication(int num_bits = 64);
 
 /**
  * 打印菜单选项
