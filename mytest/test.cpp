@@ -137,67 +137,6 @@ void example_batch_single_multiply()
     auto coeff_modulus = context_data.parms().coeff_modulus();
     size_t N = poly_modulus_degree * encrypted_vector_a_coeff.coeff_modulus_size();
     vector<uint64_t> scalar_vector(N, 0ULL);
-    
-    // ----------------------------- test for different values -----------------------------
-
-    // Initialize scalar_vector with different values for each coefficient but same value across RNS layers
-    for (size_t i = 0; i < poly_modulus_degree; i++) {
-        for (size_t j = 0; j < encrypted_vector_a_coeff.coeff_modulus_size(); j++) {
-            scalar_vector[i + j * poly_modulus_degree] = i;
-        }
-    }
-
-    // --------------------------------------------------------------------------------------------
-
-    auto total_start = chrono::high_resolution_clock::now();
-    chrono::microseconds total_mul_time(0);
-    chrono::microseconds total_mod_time(0);
-
-    // Process each polynomial in the ciphertext
-    for (int i = 0; i < encrypted_vector_a_coeff.size(); i++) {
-        uint64_t* coeffs = encrypted_vector_a_coeff.data(i);
-        vector<uint64_t> temp(N);
-        
-        // Time the multiplication operation
-        auto mul_start = chrono::high_resolution_clock::now();
-        // Perform element-wise multiplication across all RNS layers
-        transform(
-            coeffs, coeffs + N,
-            scalar_vector.begin(),
-            temp.begin(),
-            [](uint64_t a, uint64_t b) { return a * b; }
-        );
-        auto mul_end = chrono::high_resolution_clock::now();
-        total_mul_time += chrono::duration_cast<chrono::microseconds>(mul_end - mul_start);
-
-        auto mod_start = chrono::high_resolution_clock::now();
-        // Apply modulo operation for each RNS layer separately
-        for (int j = 0; j < encrypted_vector_a_coeff.coeff_modulus_size(); j++) {
-            uint64_t modulus = coeff_modulus[j].value();
-            uint64_t* layer_start = temp.data() + j * encrypted_vector_a_coeff.poly_modulus_degree();
-            transform(
-                layer_start, layer_start + encrypted_vector_a_coeff.poly_modulus_degree(),
-                layer_start,
-                [modulus](uint64_t a) { return a % modulus; }
-            );
-        }
-        auto mod_end = chrono::high_resolution_clock::now();
-        total_mod_time += chrono::duration_cast<chrono::microseconds>(mod_end - mod_start);
-
-        // Copy results back to the original coefficients
-        copy(temp.begin(), temp.end(), coeffs);
-    }
-
-    auto total_end = chrono::high_resolution_clock::now();
-    auto total_duration = chrono::duration_cast<chrono::microseconds>(total_end - total_start);
-
-    cout << "Total multiplication time: " << total_mul_time.count() << " microseconds" << endl;
-    cout << "Total modulo time: " << total_mod_time.count() << " microseconds" << endl;
-    cout << "Total time: " << total_duration.count() << " microseconds" << endl;
-
-    evaluator.transform_from_ntt_inplace(encrypted_vector_a_coeff);
-    decryptor.decrypt(encrypted_vector_a_coeff, plain_vector_a_coeff);
-    cout << "decrypted plaintext polynomial: " << plain_vector_a_coeff.to_string() << endl;
 }
 
 int main()

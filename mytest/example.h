@@ -67,6 +67,12 @@ void test_function();
 int test_general_multiplication(int num_bits = 64);
 
 /**
+ * 测试密文scale乘法功能
+ * @return 成功返回0，失败返回1
+ */
+int test_ciphertext_scale_multiplication();
+
+/**
  * 打印菜单选项
  */
 void print_menu();
