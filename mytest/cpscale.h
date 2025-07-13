@@ -67,8 +67,16 @@ double scale_coefficients_blas(
  */
 double scale_ciphertext_direct(
     const SEALContext& context,
+    Evaluator& evaluator,
     Ciphertext& encrypted,
     uint64_t scale,
     MemoryPoolHandle pool);
 
+
+inline string uint64_to_hex_string(uint64_t value)
+{
+    stringstream stream;
+    stream << hex << value;
+    return stream.str();
+}
 #endif // CPSCALE_H

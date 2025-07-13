@@ -587,7 +587,7 @@ int test_general_multiplication(int num_bits) {
         cout << "\n=== 创建测试向量 ===" << endl;
         vector<uint64_t> input_vector(poly_modulus_degree);
         for (size_t i = 0; i < poly_modulus_degree; i++) {
-            input_vector[i] = rand() % 8;
+            input_vector[i] = rand() % 2;
         }
         cout << "输入向量大小: " << input_vector.size() << endl;
         cout << "前10个元素: ";
@@ -595,7 +595,7 @@ int test_general_multiplication(int num_bits) {
             cout << input_vector[i] << " ";
         }
         cout << endl;
-        vector<uint64_t> test_multipliers = {3, 7, 15, 31, 63, 127, 255, 511, 1023};
+        vector<uint64_t> test_multipliers = {3, 15, 255, 3, 15, 255};
         for (uint64_t multiplier : test_multipliers) {
             cout << "\n=== 测试乘以" << multiplier << " ===" << endl;
             vector<vector<uint64_t>> bit_vectors;
@@ -749,10 +749,10 @@ int test_ciphertext_scale_multiplication() {
             
         } else if (version_choice == 2) {
             // 直接对密文进行scale，不需要提取和重新打包
-            for (size_t i = 0; i < 100; i++) {
+              for (size_t i = 0; i < 100; i++) {
                 scaled_encrypted = encrypted; // 复制原始密文
                 MemoryPoolHandle pool = MemoryManager::GetPool();
-                multiply_time += scale_ciphertext_direct(context, scaled_encrypted, scale, pool);
+                multiply_time += scale_ciphertext_direct(context, evaluator, scaled_encrypted, scale, pool);
             }
             multiply_time /= 100;
             

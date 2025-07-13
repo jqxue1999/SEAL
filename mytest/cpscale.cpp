@@ -216,29 +216,29 @@ double scale_coefficients_blas(
 
 double scale_ciphertext_direct(
     const SEALContext& context,
+    Evaluator& evaluator,
     Ciphertext& encrypted,
     uint64_t scale,
     MemoryPoolHandle pool)
 {
-    auto start_time = chrono::high_resolution_clock::now();
+    Plaintext scale_plaintext(uint64_to_hex_string(scale));
     
-    cout << "开始直接对密文进行scale乘法，scale=" << scale << endl;
-    
-    // 获取加密参数
     auto context_data = context.get_context_data(encrypted.parms_id());
     const auto& parms = context_data->parms();
+
+    auto start_time = chrono::high_resolution_clock::now();
+
+    evaluator.multiply_plain_inplace(encrypted, scale_plaintext);
     
-    // 使用util::negacyclic_multiply_poly_mono_coeffmod直接对密文进行scale
-    util::negacyclic_multiply_poly_mono_coeffmod(
-        encrypted, 
-        encrypted.size(), 
-        scale, 
-        0, 
-        parms.coeff_modulus(), 
-        encrypted, 
-        pool);
-    
-    cout << "直接scale乘法完成！" << endl;
+    // // 使用util::negacyclic_multiply_poly_mono_coeffmod直接对密文进行scale
+    // util::negacyclic_multiply_poly_mono_coeffmod(
+    //     encrypted, 
+    //     encrypted.size(), 
+    //     scale, 
+    //     0, 
+    //     parms.coeff_modulus(), 
+    //     encrypted, 
+    //     pool);
 
     auto end_time = chrono::high_resolution_clock::now();
     auto total_time = chrono::duration_cast<chrono::duration<double>>(end_time - start_time);
