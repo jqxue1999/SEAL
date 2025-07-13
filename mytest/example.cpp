@@ -8,33 +8,36 @@
 using namespace seal;
 using namespace std;
 
-json read_seal_config(const string& config_file) {
+json read_seal_config(const string& config_file, bool verbose) {
     json config;
     
     // 打印当前工作目录
     char cwd[1024];
     if (getcwd(cwd, sizeof(cwd)) != NULL) {
-        cout << "当前工作目录: " << cwd << endl;
+        if (verbose)
+            cout << "Current working directory: " << cwd << endl;
     } else {
-        cout << "无法获取当前工作目录" << endl;
+            cout << "Cannot get current working directory" << endl;
     }
     
     // 直接使用固定路径
     string config_path = "../../" + config_file;
-    cout << "尝试读取配置文件: " << config_path << endl;
+    if (verbose)
+        cout << "Try to read config file: " << config_path << endl;
     
     try {
         ifstream file(config_path);
         if (file.is_open()) {
             file >> config;
             file.close();
-            cout << "成功读取配置文件: " << config_path << endl;
+            if (verbose)
+                cout << "Successfully read config file: " << config_path << endl;
             return config;
         } else {
-            cerr << "错误: 无法打开配置文件 " << config_path << endl;
+            cerr << "Error: cannot open config file " << config_path << endl;
         }
     } catch (const exception& e) {
-        cerr << "错误: 解析配置文件失败: " << e.what() << endl;
+        cerr << "Error: cannot parse config file: " << e.what() << endl;
     }
     
     return config;
@@ -89,9 +92,9 @@ void print_menu() {
     cout << "1. CPMM (Ciphertext-Plaintext Matrix Multiplication) - 密文-明文矩阵乘法" << endl;
     cout << "2. CCMM (Ciphertext-Ciphertext Matrix Multiplication) - 密文-密文矩阵乘法" << endl;
     cout << "3. CMT (Ciphertext Matrix Transpose) - 密文矩阵转置" << endl;
-    cout << "4. BLAS Performance Test - 测试BLAS浮点矩阵乘法性能" << endl;
-    cout << "5. General Multiplication & Carry Recovery - 通用乘法和进位恢复" << endl;
-    cout << "6. Ciphertext Scale Multiplication - 密文scale乘法" << endl;
+    cout << "4. General Multiplication & Carry Recovery - 通用乘法和进位恢复" << endl;
+    cout << "5. Ciphertext Scale Multiplication - 密文scale乘法" << endl;
+    cout << "6. Vector-Vector Multiplication - 明文vector外乘密文vector" << endl;
     cout << "7. 退出程序" << endl;
     cout << "请输入选择 (1-7): ";
 }
@@ -623,269 +626,194 @@ int test_general_multiplication(int num_bits) {
     return 0;
 }
 
-int test_ciphertext_scale_multiplication() {
+int test_ciphertext_scale_multiplication(bool verbose) {
     try {
-        // 读取配置文件
         json config = read_seal_config();
         if (config.empty()) {
-            cerr << "无法读取配置文件，使用默认参数" << endl;
+            cerr << "Error: cannot read config file" << endl;
             return 1;
         }
         
-        // 获取用户输入的多项式模数次数
-        size_t poly_modulus_degree = get_user_poly_modulus_degree(config);
-        
-        // 获取对应的系数模数参数
-        vector<int> coeff_modulus_params = get_coeff_modulus_params(config, poly_modulus_degree);
-        if (coeff_modulus_params.empty()) {
-            cerr << "无法获取系数模数参数" << endl;
-            return 1;
-        }
-        
-        // 设置加密参数
-        scheme_type scheme = scheme_type::bfv;
-        EncryptionParameters parms(scheme);
-        parms.set_poly_modulus_degree(poly_modulus_degree);
-        parms.set_coeff_modulus(CoeffModulus::Create(poly_modulus_degree, coeff_modulus_params));
-        parms.set_plain_modulus(PlainModulus::Batching(poly_modulus_degree, 20));
+        vector<size_t> poly_modulus_degree_options = {16384, 8192, 4096};
+        for (size_t poly_modulus_degree : poly_modulus_degree_options) {
+            cout << "degree: " << poly_modulus_degree << endl;
+            vector<int> coeff_modulus_params = get_coeff_modulus_params(config, poly_modulus_degree);
+            if (coeff_modulus_params.empty()) {
+                cerr << "Error: cannot get coeff modulus params" << endl;
+                return 1;
+            }
+            
+            scheme_type scheme = scheme_type::bfv;
+            EncryptionParameters parms(scheme);
+            parms.set_poly_modulus_degree(poly_modulus_degree);
+            parms.set_coeff_modulus(CoeffModulus::Create(poly_modulus_degree, coeff_modulus_params));
+            parms.set_plain_modulus(PlainModulus::Batching(poly_modulus_degree, 20));
 
-        SEALContext context(parms);
-        print_parameters(context);
-        
-        // 生成密钥
-        KeyGenerator keygen(context);
-        SecretKey secret_key = keygen.secret_key();
-        PublicKey public_key;
-        keygen.create_public_key(public_key);
-        
-        Encryptor encryptor(context, public_key);
-        Decryptor decryptor(context, secret_key);
-        Evaluator evaluator(context);
-        
-        cout << "\n=== 测试参数 ===" << endl;
-        cout << "多项式模数次数: " << poly_modulus_degree << endl;
-        cout << "系数模数层数: " << parms.coeff_modulus().size() << endl;
-        
-        // 第一步：创建测试向量并加密
-        cout << "\n=== 第一步：创建测试向量并加密 ===" << endl;
-        vector<uint64_t> input_vector(poly_modulus_degree);
-        
-         for (size_t i = 0; i < poly_modulus_degree; i++)
-            input_vector[i] = rand() % 100;
-        
-        cout << "输入向量大小: " << input_vector.size() << endl;
-        cout << "前10个元素: ";
-        for (size_t i = 0; i < min(size_t(10), input_vector.size()); i++) {
-            cout << input_vector[i] << " ";
-        }
-        cout << endl;
-        
-        // 编码为明文多项式
-        Plaintext plaintext;
-        encode_vector_to_plaintext(input_vector, context, plaintext);
-        
-        // 加密
-        Ciphertext encrypted;
-        encryptor.encrypt(plaintext, encrypted);
-        
-        cout << "加密完成，密文大小: " << encrypted.size() << endl;
-        
-        // 第二步：提取系数、乘以scale、重新打包
-        cout << "\n=== 第二步：提取系数、乘以scale、重新打包 ===" << endl;
-        
-        // 获取用户输入的scale值
-        uint64_t scale;
-        cout << "请输入scale值: ";
-        cin >> scale;
-        cin.ignore();
-        
-        cout << "使用scale值: " << scale << endl;
-        
-        // 统计时间
-        auto total_start = chrono::high_resolution_clock::now();
-        
-        // 选择使用哪种方法
-        cout << "请选择scale乘法方法:" << endl;
-        cout << "1. BLAS加速版本（提取系数->BLAS乘法->重新打包）" << endl;
-        cout << "2. 直接版本（使用util::negacyclic_multiply_poly_mono_coeffmod）" << endl;
-        cout << "请输入选择 (1-2): ";
-        int version_choice;
-        cin >> version_choice;
-        cin.ignore();
-        
-        vector<vector<uint64_t>> coeff_matrix_a, coeff_matrix_b;
-        vector<uint64_t> modulus_vector;
-        chrono::microseconds extract_duration(0);
-        
-        if (version_choice == 1) {
-            // 2.1 提取系数 - 使用cpscale.cpp中的函数
-            auto extract_start = chrono::high_resolution_clock::now();
+            SEALContext context(parms);
+            if (verbose)
+                print_parameters(context);
             
-            double extract_time = extract_coefficients_from_single_ciphertext(
-                context, encrypted, coeff_matrix_a, coeff_matrix_b, modulus_vector);
+            // 生成密钥
+            KeyGenerator keygen(context);
+            SecretKey secret_key = keygen.secret_key();
+            PublicKey public_key;
+            keygen.create_public_key(public_key);
             
-            auto extract_end = chrono::high_resolution_clock::now();
-            extract_duration = chrono::duration_cast<chrono::microseconds>(extract_end - extract_start);
+            Encryptor encryptor(context, public_key);
+            Decryptor decryptor(context, secret_key);
+            Evaluator evaluator(context);
+
+            vector<uint64_t> input_vector(poly_modulus_degree);
+
+            vector<double> time_vec{0, 0, 0, 0};
             
-            cout << "系数提取完成，耗时: " << extract_duration.count() << " microseconds" << endl;
-        }
-        
-        // 2.2 乘以scale
-        auto multiply_start = chrono::high_resolution_clock::now();
-        
-        double multiply_time = 0;
-        Ciphertext scaled_encrypted;
-        
-        if (version_choice == 1) {
-            multiply_time = scale_coefficients_blas(coeff_matrix_a, coeff_matrix_b, modulus_vector, scale);
-            
-            // 重新打包为密文
-            auto repack_start = chrono::high_resolution_clock::now();
-            double repack_time = build_single_ciphertext_from_result(
-                context, coeff_matrix_a, coeff_matrix_b, scaled_encrypted);
-            auto repack_end = chrono::high_resolution_clock::now();
-            auto repack_duration = chrono::duration_cast<chrono::microseconds>(repack_end - repack_start);
-            cout << "重新打包完成，耗时: " << repack_duration.count() << " microseconds" << endl;
-            
-        } else if (version_choice == 2) {
-            // 直接对密文进行scale，不需要提取和重新打包
-              for (size_t i = 0; i < 100; i++) {
-                scaled_encrypted = encrypted; // 复制原始密文
-                MemoryPoolHandle pool = MemoryManager::GetPool();
-                multiply_time += scale_ciphertext_direct(context, evaluator, scaled_encrypted, scale, pool);
+            int num_runs = 1000;
+            for (size_t run = 0; run < num_runs; run++)
+            {
+                for (size_t i = 0; i < poly_modulus_degree; i++)
+                    input_vector[i] = rand() % 1000;
+
+                uint64_t scale = rand() % 1000;
+                
+                Plaintext plaintext;
+                encode_vector_to_plaintext(input_vector, context, plaintext);
+                Ciphertext encrypted;
+                encryptor.encrypt(plaintext, encrypted);
+
+                Ciphertext scaled_encrypted;
+                vector<double> time_vec_tmp = scale_vector_blas(context, encrypted, scaled_encrypted, scale, verbose);
+                time_vec[0] += time_vec_tmp[0];
+                time_vec[1] += time_vec_tmp[1];
+                time_vec[2] += time_vec_tmp[2];
+                time_vec[3] += time_vec_tmp[3];
+                Plaintext scaled_decrypted;
+                decryptor.decrypt(scaled_encrypted, scaled_decrypted);
+                vector<uint64_t> scaled_vector;
+                decode_plaintext_to_vector(scaled_decrypted, context, scaled_vector);
+
+                for (size_t i = 0; i < input_vector.size(); i++) {
+                    uint64_t expected = (input_vector[i] * scale) % parms.plain_modulus().value();
+                    uint64_t actual = scaled_vector[i];
+                    
+                    if (expected != actual) {
+                        throw runtime_error("Verification failed!");
+                    }
+                }
             }
-            multiply_time /= 100;
-            
-        } else {
-            throw std::runtime_error("Invalid version choice");
+            cout << "\033[33mCoefficients extraction time: " << time_vec[0] * 1000 / num_runs << " ms\033[0m" << endl;
+            cout << "\033[33mCoefficients multiplication time: " << time_vec[1] * 1000 / num_runs << " ms\033[0m" << endl;
+            cout << "\033[33mCiphertext repackaging time: " << time_vec[2] * 1000 / num_runs << " ms\033[0m" << endl;
+            cout << "\033[32mTotal time: " << time_vec[3] * 1000 / num_runs << " ms\033[0m" << endl;
         }
-        
-        auto multiply_end = chrono::high_resolution_clock::now();
-        auto multiply_duration = chrono::duration_cast<chrono::microseconds>(multiply_end - multiply_start);
-        
-        cout << "系数乘法完成，耗时: " << multiply_duration.count() << " microseconds" << endl;
-        
-        auto total_end = chrono::high_resolution_clock::now();
-        auto total_duration = chrono::duration_cast<chrono::microseconds>(total_end - total_start);
-        
-        cout << "总耗时: " << total_duration.count() << " microseconds" << endl;
-        cout << "详细统计:" << endl;
-        if (version_choice == 2) {
-            cout << "  直接scale乘法: " << multiply_duration.count() << " microseconds" << endl;
-        } else {
-            cout << "  系数提取: " << extract_duration.count() << " microseconds" << endl;
-            cout << "  系数乘法: " << multiply_duration.count() << " microseconds" << endl;
-        }
-        
-        // 第三步：解密并验证
-        cout << "\n=== 第三步：解密并验证 ===" << endl;
-        
-        // 解密原始密文
-        Plaintext decrypted_original;
-        decryptor.decrypt(encrypted, decrypted_original);
-        vector<uint64_t> original_vector;
-        decode_plaintext_to_vector(decrypted_original, context, original_vector);
-        
-        // 解密scaled密文
-        Plaintext decrypted_scaled;
-        decryptor.decrypt(scaled_encrypted, decrypted_scaled);
-        vector<uint64_t> scaled_vector;
-        decode_plaintext_to_vector(decrypted_scaled, context, scaled_vector);
-        
-        cout << "原始向量前10个元素: ";
-        for (size_t i = 0; i < min(size_t(10), original_vector.size()); i++) {
-            cout << original_vector[i] << " ";
-        }
-        cout << endl;
-        
-        cout << "Scaled向量前10个元素: ";
-        for (size_t i = 0; i < min(size_t(10), scaled_vector.size()); i++) {
-            cout << scaled_vector[i] << " ";
-        }
-        cout << endl;
-        
-        // 验证结果
-        bool all_correct = true;
-        size_t check_size = min(size_t(10), input_vector.size());
-        
-        cout << "\n验证前" << check_size << "个元素:" << endl;
-        for (size_t i = 0; i < check_size && all_correct; i++) {
-            uint64_t expected = (input_vector[i] * scale) % parms.plain_modulus().value();
-            uint64_t actual = scaled_vector[i];
-            
-            if (expected != actual) {
-                cout << "错误: 位置[" << i << "] "
-                     << "期望=" << expected 
-                     << ", 实际=" << actual << endl;
-                all_correct = false;
-            }
-        }
-        
-        if (all_correct) {
-            cout << "✓ 密文scale乘法测试成功！前" << check_size << "个元素完全正确。" << endl;
-        } else {
-            cout << "✗ 密文scale乘法测试失败！" << endl;
-        }
-        
-        cout << "\n=== 测试完成 ===" << endl;
-        
     } catch (const exception& e) {
-        cerr << "错误: " << e.what() << endl;
+        cerr << "Error: " << e.what() << endl;
         return 1;
     }
     
     return 0;
 }
 
-void test_function() {
-    using namespace std::chrono;
-    constexpr size_t N = 4096;
-    cout << "\n=== vector<vector<uint64_t>> 到 vector<double> 两种转换方式性能对比 ===" << endl;
-    cout << "矩阵大小: " << N << "x" << N << endl;
+int test_vector_vector_outer_multiplication(bool verbose) {
+    try {
+        json config = read_seal_config("seal_config.json", verbose);
+        if (config.empty()) {
+            cerr << "Error: cannot read config file" << endl;
+            return 1;
+        }
+        
+        vector<size_t> poly_modulus_degree_options = {4096, 8192, 16384};
+        for (size_t poly_modulus_degree : poly_modulus_degree_options) {
+            cout << "degree: " << poly_modulus_degree << endl;
+            vector<int> coeff_modulus_params = get_coeff_modulus_params(config, poly_modulus_degree);
+            if (coeff_modulus_params.empty()) {
+                cerr << "Error: cannot get coeff modulus params" << endl;
+                return 1;
+            }
+            
+            scheme_type scheme = scheme_type::bfv;
+            EncryptionParameters parms(scheme);
+            parms.set_poly_modulus_degree(poly_modulus_degree);
+            parms.set_coeff_modulus(CoeffModulus::Create(poly_modulus_degree, coeff_modulus_params));
+            parms.set_plain_modulus(PlainModulus::Batching(poly_modulus_degree, 20));
 
-    // 生成测试数据
-    vector<vector<uint64_t>> A(N, vector<uint64_t>(N));
-    for (size_t i = 0; i < N; ++i)
-        for (size_t j = 0; j < N; ++j)
-            A[i][j] = rand() % 100;
+            SEALContext context(parms);
+            if (verbose)
+                print_parameters(context);
+            
+            // 生成密钥
+            KeyGenerator keygen(context);
+            SecretKey secret_key = keygen.secret_key();
+            PublicKey public_key;
+            keygen.create_public_key(public_key);
+            
+            Encryptor encryptor(context, public_key);
+            Decryptor decryptor(context, secret_key);
+            Evaluator evaluator(context);
 
-    // 方式1：直接for循环转换
-    cout << "\n方式1: 直接for循环转换为vector<double>..." << endl;
-    auto t1_start = high_resolution_clock::now();
-    vector<double> A_1(N * N);
-    for (size_t i = 0; i < N; ++i)
-        for (size_t j = 0; j < N; ++j)
-            A_1[i * N + j] = static_cast<double>(A[i][j]);
-    auto t1_end = high_resolution_clock::now();
-    auto t1 = duration_cast<milliseconds>(t1_end - t1_start).count();
-    cout << "耗时: " << t1 << " ms" << endl;
-
-    // 方式2：先展开为一维再用构造函数
-    cout << "\n方式2: 先展开为vector<uint64_t>再用构造函数转换为vector<double>..." << endl;
-    auto t2_start = high_resolution_clock::now();
+            vector<uint64_t> input_vector(poly_modulus_degree);
+            vector<double> time_vec{0, 0, 0, 0};
+            
+            int num_runs = 1;
+            int plain_vector_size = 4096;
+            for (size_t run = 0; run < num_runs; run++) {
+                for (size_t i = 0; i < poly_modulus_degree; i++) {
+                    input_vector[i] = rand() % 1000;
+                }
+                
+                vector<uint64_t> plain_vector(plain_vector_size);
+                for (size_t i = 0; i < plain_vector_size; i++) {
+                    plain_vector[i] = rand() % 1000;
+                }
+                
+                Plaintext plaintext;
+                encode_vector_to_plaintext(input_vector, context, plaintext);
+                Ciphertext encrypted;
+                encryptor.encrypt(plaintext, encrypted);
+                
+                vector<Ciphertext> result_vector;
+                vector<double> time_vec_tmp = vector_vector_outer_multiply_blas(
+                    context, plain_vector, encrypted, result_vector, verbose);
+                
+                time_vec[0] += time_vec_tmp[0];
+                time_vec[1] += time_vec_tmp[1];
+                time_vec[2] += time_vec_tmp[2];
+                time_vec[3] += time_vec_tmp[3];
+                
+                vector<vector<uint64_t>> expected_outer_product(plain_vector_size, vector<uint64_t>(poly_modulus_degree));
+                for (size_t i = 0; i < plain_vector_size; i++) {
+                    for (size_t j = 0; j < poly_modulus_degree; j++) {
+                        expected_outer_product[i][j] = (input_vector[j] * plain_vector[i]) % parms.plain_modulus().value();
+                    }
+                }
+                
+                for (size_t i = 0; i < plain_vector_size; i++) {
+                    Plaintext decrypted_plaintext;
+                    decryptor.decrypt(result_vector[i], decrypted_plaintext);
+                    vector<uint64_t> decrypted_vector;
+                    decode_plaintext_to_vector(decrypted_plaintext, context, decrypted_vector);
+                    
+                    for (size_t j = 0; j < poly_modulus_degree; j++) {
+                        uint64_t expected = expected_outer_product[i][j];
+                        uint64_t actual = decrypted_vector[j];
+                        
+                        if (expected != actual) {
+                            throw runtime_error("Vector-vector outer multiplication verification failed!");
+                        }
+                    }
+                }
+            }
+            
+            cout << "\033[33mCoefficients extraction time: " << time_vec[0] * 1000 / num_runs << " ms\033[0m" << endl;
+            cout << "\033[33mCoefficients multiplication time: " << time_vec[1] * 1000 / num_runs << " ms\033[0m" << endl;
+            cout << "\033[33mCiphertext repackaging time: " << time_vec[2] * 1000 / num_runs << " ms\033[0m" << endl;
+            cout << "\033[32mTotal time: " << time_vec[3] * 1000 / num_runs << " ms\033[0m" << endl;
+        }
+    } catch (const exception& e) {
+        cerr << "Error: " << e.what() << endl;
+        return 1;
+    }
     
-    // 步骤2a：展开为vector<uint64_t>
-    auto t2a_start = high_resolution_clock::now();
-    vector<uint64_t> A_flat;
-    A_flat.reserve(N * N);
-    for (const auto& row : A) A_flat.insert(A_flat.end(), row.begin(), row.end());
-    auto t2a_end = high_resolution_clock::now();
-    auto t2a = duration_cast<milliseconds>(t2a_end - t2a_start).count();
-    cout << "  步骤2a (展开为vector<uint64_t>): " << t2a << " ms" << endl;
-    
-    // 步骤2b：用构造函数转换为vector<double>
-    auto t2b_start = high_resolution_clock::now();
-    vector<double> A_2(A_flat.begin(), A_flat.end());
-    auto t2b_end = high_resolution_clock::now();
-    auto t2b = duration_cast<milliseconds>(t2b_end - t2b_start).count();
-    cout << "  步骤2b (构造函数转换为vector<double>): " << t2b << " ms" << endl;
-    
-    auto t2_end = high_resolution_clock::now();
-    auto t2 = duration_cast<milliseconds>(t2_end - t2_start).count();
-    cout << "  方式2总耗时: " << t2 << " ms" << endl;
-
-    cout << "\n方式1/方式2的A_1[0] = " << A_1[0] << ", A_2[0] = " << A_2[0] << endl;
-    cout << "\n=== 性能对比结束 ===" << endl;
+    return 0;
 }
 
 int main() {
@@ -926,11 +854,6 @@ int main() {
             }
         }
         else if (choice == "4") {
-            cout << "\n开始测试 BLAS浮点矩阵乘法性能..." << endl;
-            cout << "==========================================" << endl;
-            test_function();
-        }
-        else if (choice == "5") {
             cout << "\n开始自定义位数测试..." << endl;
             cout << "==========================================" << endl;
             
@@ -944,14 +867,15 @@ int main() {
             else
                 cout << "\n通用乘法测试失败！（bit宽度=" << num_bits << ")" << endl;
         }
-        else if (choice == "6") {
+        else if (choice == "5") {
             cout << "\n开始测试密文scale乘法..." << endl;
             cout << "==========================================" << endl;
-            int result = test_ciphertext_scale_multiplication();
-            if (result == 0)
-                cout << "\n密文scale乘法测试成功完成！" << endl;
-            else
-                cout << "\n密文scale乘法测试失败！" << endl;
+            test_ciphertext_scale_multiplication(false);
+        }
+        else if (choice == "6") {
+            cout << "\n开始测试明文vector外乘密文vector..." << endl;
+            cout << "==========================================" << endl;
+            test_vector_vector_outer_multiplication(false);
         }
         else if (choice == "7") {
             cout << "程序退出。" << endl;

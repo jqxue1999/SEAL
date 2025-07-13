@@ -16,7 +16,8 @@ double extract_coefficients_from_single_ciphertext(
     const Ciphertext& encrypted,
     vector<vector<uint64_t>>& coeff_matrix_a,
     vector<vector<uint64_t>>& coeff_matrix_b,
-    vector<uint64_t>& modulus_vector)
+    vector<uint64_t>& modulus_vector,
+    bool verbose)
 {
     auto start_time = chrono::high_resolution_clock::now();
     
@@ -24,8 +25,10 @@ double extract_coefficients_from_single_ciphertext(
     size_t poly_modulus_degree = context_data->parms().poly_modulus_degree();
     size_t coeff_modulus_size = encrypted.coeff_modulus_size();
     
-    cout << "开始提取系数..." << endl;
-    cout << "RNS层数: " << coeff_modulus_size << endl;
+    if (verbose) {
+        cout << "开始提取系数..." << endl;
+        cout << "RNS层数: " << coeff_modulus_size << endl;
+    }
     
     // 获取modulus vector
     auto coeff_modulus = context_data->parms().coeff_modulus();
@@ -34,11 +37,13 @@ double extract_coefficients_from_single_ciphertext(
         modulus_vector[i] = coeff_modulus[i].value();
     }
     // 打印modulus_vector
-    cout << "modulus_vector: ";
-    for (size_t i = 0; i < coeff_modulus_size; i++) {
-        cout << modulus_vector[i] << " ";
+    if (verbose) {
+        cout << "modulus_vector: ";
+        for (size_t i = 0; i < coeff_modulus_size; i++) {
+            cout << modulus_vector[i] << " ";
+        }
+        cout << endl;
     }
-    cout << endl;
     
     // 初始化系数矩阵 - 第一维是RNS层，第二维是该密文在该RNS层上的系数
     coeff_matrix_a.resize(coeff_modulus_size);
@@ -65,8 +70,10 @@ double extract_coefficients_from_single_ciphertext(
         }
         
         // 显示进度
-        cout << "\r提取系数进度: RNS层 " << (rns_layer + 1) << "/" << coeff_modulus_size 
-             << " [" << (rns_layer + 1) * 100 / coeff_modulus_size << "%]" << flush;
+        if (verbose) {
+            cout << "\r提取系数进度: RNS层 " << (rns_layer + 1) << "/" << coeff_modulus_size 
+                 << " [" << (rns_layer + 1) * 100 / coeff_modulus_size << "%]" << flush;
+        }
     }
 
     auto end_time = chrono::high_resolution_clock::now();
@@ -80,7 +87,8 @@ double build_single_ciphertext_from_result(
     const SEALContext& context,
     const vector<vector<uint64_t>>& result_a_matrix,
     const vector<vector<uint64_t>>& result_b_matrix,
-    Ciphertext& result_encrypted)
+    Ciphertext& result_encrypted,
+    bool verbose)
 {
     auto start_time = chrono::high_resolution_clock::now();
     
@@ -98,9 +106,6 @@ double build_single_ciphertext_from_result(
         cerr << "RNS layer count mismatch in result matrices" << endl;
         return 0;
     }
-    
-    cout << "开始构建单个密文..." << endl;
-    cout << "RNS层数: " << coeff_modulus_size << endl;
     
     // 创建新的密文
     result_encrypted.resize(context, 2); // 2个多项式：a和b
@@ -126,8 +131,6 @@ double build_single_ciphertext_from_result(
             }
         }
     }
-    
-    cout << "单个密文构建完成！" << endl;
 
     auto end_time = chrono::high_resolution_clock::now();
     auto total_time = chrono::duration_cast<chrono::duration<double>>(end_time - start_time);
@@ -139,7 +142,8 @@ double scale_coefficients_blas(
     vector<vector<uint64_t>>& coeff_matrix_a,
     vector<vector<uint64_t>>& coeff_matrix_b,
     const vector<uint64_t>& modulus_vector,
-    uint64_t scale)
+    uint64_t scale,
+    bool verbose)
 {
     auto start_time = chrono::high_resolution_clock::now();
     
@@ -150,8 +154,6 @@ double scale_coefficients_blas(
     
     size_t coeff_modulus_size = coeff_matrix_a.size();
     size_t coeff_count = coeff_matrix_a[0].size();
-    
-    cout << "开始对系数进行scale乘法（BLAS版本），scale=" << scale << endl;
     
     // 统计数据类型转换时间
     chrono::duration<double> convert_time(0);
@@ -198,15 +200,19 @@ double scale_coefficients_blas(
         mod_time += chrono::duration_cast<chrono::duration<double>>(mod_end - mod_start);
         
         // 显示进度
-        cout << "\r系数乘法进度: RNS层 " << (rns_layer + 1) << "/" << coeff_modulus_size 
-             << " [" << (rns_layer + 1) * 100 / coeff_modulus_size << "%]" << flush;
+        if (verbose) {
+            cout << "\r系数乘法进度: RNS层 " << (rns_layer + 1) << "/" << coeff_modulus_size 
+                 << " [" << (rns_layer + 1) * 100 / coeff_modulus_size << "%]" << flush;
+        }
     }
     
-    cout << "\n系数乘法完成！" << endl;
-    cout << "BLAS版本时间统计:" << endl;
-    cout << "  数据类型转换时间: " << convert_time.count() << " seconds" << endl;
-    cout << "  BLAS运算时间: " << blas_time.count() << " seconds" << endl;
-    cout << "  模运算时间: " << mod_time.count() << " seconds" << endl;
+    if (verbose) {
+        cout << "\n系数乘法完成！" << endl;
+        cout << "BLAS版本时间统计:" << endl;
+        cout << "  数据类型转换时间: " << convert_time.count() << " seconds" << endl;
+        cout << "  BLAS运算时间: " << blas_time.count() << " seconds" << endl;
+        cout << "  模运算时间: " << mod_time.count() << " seconds" << endl;
+    }
 
     auto end_time = chrono::high_resolution_clock::now();
     auto total_time = chrono::duration_cast<chrono::duration<double>>(end_time - start_time);
@@ -228,20 +234,108 @@ double scale_ciphertext_direct(
 
     auto start_time = chrono::high_resolution_clock::now();
 
-    evaluator.multiply_plain_inplace(encrypted, scale_plaintext);
+    // evaluator.multiply_plain_inplace(encrypted, scale_plaintext);
     
-    // // 使用util::negacyclic_multiply_poly_mono_coeffmod直接对密文进行scale
-    // util::negacyclic_multiply_poly_mono_coeffmod(
-    //     encrypted, 
-    //     encrypted.size(), 
-    //     scale, 
-    //     0, 
-    //     parms.coeff_modulus(), 
-    //     encrypted, 
-    //     pool);
+    // 使用util::negacyclic_multiply_poly_mono_coeffmod直接对密文进行scale
+    util::negacyclic_multiply_poly_mono_coeffmod(
+        encrypted, 
+        encrypted.size(), 
+        scale, 
+        0, 
+        parms.coeff_modulus(), 
+        encrypted, 
+        pool);
 
     auto end_time = chrono::high_resolution_clock::now();
     auto total_time = chrono::duration_cast<chrono::duration<double>>(end_time - start_time);
 
     return total_time.count();
+}
+
+vector<double> scale_vector_blas(
+    const SEALContext& context,
+    const Ciphertext& encrypted,
+    Ciphertext& scaled_encrypted,
+    uint64_t scale,
+    bool verbose)
+{
+    vector<vector<uint64_t>> coeff_matrix_a, coeff_matrix_b;
+    vector<uint64_t> modulus_vector;
+    double extract_time = extract_coefficients_from_single_ciphertext(context, encrypted, coeff_matrix_a, coeff_matrix_b, modulus_vector, verbose);
+
+    double multiply_time = scale_coefficients_blas(coeff_matrix_a, coeff_matrix_b, modulus_vector, scale, verbose);
+
+    double repack_time = build_single_ciphertext_from_result(context, coeff_matrix_a, coeff_matrix_b, scaled_encrypted, verbose);
+
+    double total_time = extract_time + multiply_time + repack_time;
+
+    vector<double> time_vec = {extract_time, multiply_time, repack_time, total_time};
+    return time_vec;
+}
+
+vector<double> vector_vector_outer_multiply_blas(
+    const SEALContext& context,
+    const vector<uint64_t>& plain_vector,
+    const Ciphertext& encrypted,
+    vector<Ciphertext>& result_vector,
+    bool verbose)
+{
+    auto start_time = chrono::high_resolution_clock::now();
+    
+    size_t vector_size = plain_vector.size();
+    result_vector.resize(vector_size);
+    
+    // 统计各阶段时间
+    double total_extract_time = 0;
+    double total_multiply_time = 0;
+    double total_repack_time = 0;
+    
+    if (verbose) {
+        cout << "开始向量外乘运算，向量大小: " << vector_size << endl;
+    }
+    
+    // 只提取一次系数，然后对每个明文系数进行乘法
+    vector<vector<uint64_t>> coeff_matrix_a, coeff_matrix_b;
+    vector<uint64_t> modulus_vector;
+    
+    // 只提取一次系数
+    double extract_time = extract_coefficients_from_single_ciphertext(
+        context, encrypted, coeff_matrix_a, coeff_matrix_b, modulus_vector, false);
+    total_extract_time = extract_time;
+    
+    // 对每个明文系数进行乘法（使用OpenMP并行化）
+    #pragma omp parallel for reduction(+:total_multiply_time,total_repack_time)
+    for (size_t i = 0; i < vector_size; i++) {
+        if (verbose) {
+            #pragma omp critical
+            {
+                cout << "\r处理进度: " << (i + 1) << "/" << vector_size 
+                     << " [" << (i + 1) * 100 / vector_size << "%]" << flush;
+            }
+        }
+        
+        // 复制系数矩阵用于乘法
+        vector<vector<uint64_t>> temp_coeff_matrix_a = coeff_matrix_a;
+        vector<vector<uint64_t>> temp_coeff_matrix_b = coeff_matrix_b;
+        
+        // 进行scale乘法
+        double multiply_time = scale_coefficients_blas(
+            temp_coeff_matrix_a, temp_coeff_matrix_b, modulus_vector, plain_vector[i], false);
+        total_multiply_time += multiply_time;
+        
+        // 重建密文
+        double repack_time = build_single_ciphertext_from_result(
+            context, temp_coeff_matrix_a, temp_coeff_matrix_b, result_vector[i], false);
+        total_repack_time += repack_time;
+    }
+    
+    if (verbose) {
+        cout << "\n向量外乘运算完成！" << endl;
+    }
+    
+    auto end_time = chrono::high_resolution_clock::now();
+    auto total_time = chrono::duration_cast<chrono::duration<double>>(end_time - start_time);
+    
+    vector<double> time_vec = {total_extract_time, total_multiply_time, total_repack_time, total_time.count()};
+    return time_vec;
 }

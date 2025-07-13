@@ -17,9 +17,10 @@ using json = nlohmann::json;
 /**
  * 读取SEAL配置文件
  * @param config_file 配置文件路径
+ * @param verbose 是否显示详细输出
  * @return 配置JSON对象，失败时返回空对象
  */
-json read_seal_config(const string& config_file = "seal_config.json");
+json read_seal_config(const string& config_file = "seal_config.json", bool verbose = false);
 
 /**
  * 获取用户输入的多项式模数次数
@@ -54,11 +55,6 @@ int test_ccmm();
  */
 int test_CMT();
 
-/**
- * 测试negacyclic_multiply_poly_mono_coeffmod的移位功能
- * @return 成功返回0，失败返回1
- */
-void test_function();
 
 /**
  * 测试通用向量乘法功能
@@ -68,9 +64,17 @@ int test_general_multiplication(int num_bits = 64);
 
 /**
  * 测试密文scale乘法功能
+ * @param verbose 是否显示详细输出
  * @return 成功返回0，失败返回1
  */
-int test_ciphertext_scale_multiplication();
+int test_ciphertext_scale_multiplication(bool verbose = false);
+
+/**
+ * 测试明文vector外乘密文vector功能
+ * @param verbose 是否显示详细输出
+ * @return 成功返回0，失败返回1
+ */
+int test_vector_vector_outer_multiplication(bool verbose = false);
 
 /**
  * 打印菜单选项
