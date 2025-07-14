@@ -99,133 +99,105 @@ void print_menu() {
     cout << "请输入选择 (1-7): ";
 }
 
-int test_cpmm() {
+void test_cpmm(bool verbose) {
     try {
-        // 读取配置文件
-        json config = read_seal_config();
+        json config = read_seal_config("seal_config.json", verbose);
         if (config.empty()) {
-            cerr << "无法读取配置文件，使用默认参数" << endl;
-            return 1;
+            throw std::runtime_error("Error: cannot read config file");
         }
         
-        // 获取用户输入的多项式模数次数
-        size_t poly_modulus_degree = get_user_poly_modulus_degree(config);
-        
-        // 获取对应的系数模数参数
-        vector<int> coeff_modulus_params = get_coeff_modulus_params(config, poly_modulus_degree);
-        if (coeff_modulus_params.empty()) {
-            cerr << "无法获取系数模数参数" << endl;
-            return 1;
-        }
-        
-        // 设置加密参数
-        scheme_type scheme = scheme_type::bfv;
-        EncryptionParameters parms(scheme);
-        parms.set_poly_modulus_degree(poly_modulus_degree);
-        parms.set_coeff_modulus(CoeffModulus::Create(poly_modulus_degree, coeff_modulus_params));
-
-        uint64_t plain_modulus_value = 1;
-        if (scheme == scheme_type::ckks) {
-            for (const auto &mod : parms.coeff_modulus())
-                plain_modulus_value *= mod.value();
-        } else {
-            parms.set_plain_modulus(PlainModulus::Batching(poly_modulus_degree, 20));
-            plain_modulus_value = parms.plain_modulus().value();            
-        }
-        
-
-        SEALContext context(parms);
-        print_parameters(context);
-        
-        // 生成密钥
-        KeyGenerator keygen(context);
-        SecretKey secret_key = keygen.secret_key();
-        PublicKey public_key;
-        keygen.create_public_key(public_key);
-        
-        Encryptor encryptor(context, public_key);
-        Decryptor decryptor(context, secret_key);
-                
-        size_t d = poly_modulus_degree;
-        cout << "\n=== 测试参数 ===" << endl;
-        cout << "多项式模数次数: " << d << endl;
-        cout << "系数模数层数: " << parms.coeff_modulus().size() << endl;
-        
-        // 创建测试矩阵
-        cout << "\n=== 创建测试矩阵 ===" << endl;
-        
-        // 创建1×d的密文矩阵（每个密文编码一个矩阵行）
-        vector<Ciphertext> encrypted_matrix_2;
-        
-        // 创建d×d的明文矩阵
-        vector<vector<uint64_t>> plain_matrix_1(d, vector<uint64_t>(d));
-        vector<vector<uint64_t>> plain_matrix_2(d, vector<uint64_t>(d));
-        
-        // 初始化明文矩阵（简单的测试模式）
-        for (size_t i = 0; i < d; i++) {
-            for (size_t j = 0; j < d; j++) {
-                plain_matrix_1[i][j] = rand() % 10;
-                plain_matrix_2[i][j] = rand() % 10;
+        vector<size_t> poly_modulus_degree_options = {4096, 8192, 16384};
+        for (size_t poly_modulus_degree : poly_modulus_degree_options) {
+            cout << "degree: " << poly_modulus_degree << endl;
+            vector<int> coeff_modulus_params = get_coeff_modulus_params(config, poly_modulus_degree);
+            if (coeff_modulus_params.empty()) {
+                throw std::runtime_error("Error: cannot get coeff modulus params");
             }
+            
+            scheme_type scheme = scheme_type::bfv;
+            EncryptionParameters parms(scheme);
+            parms.set_poly_modulus_degree(poly_modulus_degree);
+            parms.set_coeff_modulus(CoeffModulus::Create(poly_modulus_degree, coeff_modulus_params));
+            parms.set_plain_modulus(PlainModulus::Batching(poly_modulus_degree, 20));
+
+            SEALContext context(parms);
+            if (verbose)
+                print_parameters(context);
+            
+            // 生成密钥
+            KeyGenerator keygen(context);
+            SecretKey secret_key = keygen.secret_key();
+            PublicKey public_key;
+            keygen.create_public_key(public_key);
+            
+            Encryptor encryptor(context, public_key);
+            Decryptor decryptor(context, secret_key);
+            
+            size_t d = poly_modulus_degree;
+            vector<double> time_vec{0, 0, 0};
+            
+            int num_runs = 10;
+            for (size_t run = 0; run < num_runs; run++) {
+                // 创建d×d的明文矩阵
+                vector<vector<uint64_t>> plain_matrix_1(d, vector<uint64_t>(d));
+                vector<vector<uint64_t>> plain_matrix_2(d, vector<uint64_t>(d));
+                
+                // 初始化明文矩阵（简单的测试模式）
+                for (size_t i = 0; i < d; i++) {
+                    for (size_t j = 0; j < d; j++) {
+                        plain_matrix_1[i][j] = rand() % 10;
+                        plain_matrix_2[i][j] = rand() % 10;
+                    }
+                }
+                
+                // 创建并加密矩阵行
+                vector<Ciphertext> encrypted_matrix_2;
+                encrypt_matrix(true, context, encryptor, plain_matrix_2, encrypted_matrix_2);
+                
+                // 执行矩阵乘法
+                vector<Ciphertext> result_matrix;
+                vector<double> time_vec_tmp = ciphertext_plaintext_matrix_multiply(
+                    context, plain_matrix_1, encrypted_matrix_2, result_matrix, verbose);
+                
+                time_vec[0] += time_vec_tmp[0];
+                time_vec[1] += time_vec_tmp[1];
+                time_vec[2] += time_vec_tmp[2];
+                
+                // 验证结果
+                vector<vector<uint64_t>> expected_result;
+                matrix_multiply_plain_blas(plain_matrix_1, plain_matrix_2, expected_result);
+                
+                vector<vector<uint64_t>> decrypted_result_matrix;
+                decrypt_ciphertexts_to_matrix(true, context, decryptor, result_matrix, decrypted_result_matrix);
+                
+                // 检查结果是否正确
+                bool all_correct = true;
+                size_t check_size = min(size_t(10), d); // 只检查前10x10
+                
+                for (size_t i = 0; i < check_size && all_correct; i++) {
+                    for (size_t j = 0; j < check_size && all_correct; j++) {
+                        if (decrypted_result_matrix[i][j] != expected_result[i][j]) {
+                            cout << "Error: position[" << i << "][" << j << "] "
+                                 << "expected=" << expected_result[i][j] 
+                                 << ", actual=" << decrypted_result_matrix[i][j] << endl;
+                            all_correct = false;
+                        }
+                    }
+                }
+                
+                if (!all_correct) {
+                    throw runtime_error("CPMM verification failed!");
+                }
+            }
+            
+            cout << "\033[33mCoefficients extraction time: " << time_vec[0] * 1000 / num_runs << " ms\033[0m" << endl;
+            cout << "\033[33mMatrix multiplication time: " << time_vec[1] * 1000 / num_runs << " ms\033[0m" << endl;
+            cout << "\033[33mCiphertext repackaging time: " << time_vec[2] * 1000 / num_runs << " ms\033[0m" << endl;
+            cout << "\033[32mTotal time: " << (time_vec[0] + time_vec[1] + time_vec[2]) * 1000 / num_runs << " ms\033[0m" << endl;
         }
-        
-        // 创建并加密矩阵行
-        encrypt_matrix(true, context, encryptor, plain_matrix_2, encrypted_matrix_2);
-
-        print_matrix(plain_matrix_1, "明文矩阵 1");
-        print_matrix(plain_matrix_2, "明文矩阵 2");
-        print_ciphertext_info(encrypted_matrix_2, "密文矩阵 2");
-        
-        // 执行矩阵乘法
-        cout << "\n=== 执行密文-明文矩阵乘法 ===" << endl;
-        vector<Ciphertext> result_matrix;
-        
-        auto start_time = chrono::high_resolution_clock::now();
-        
-        bool success = ciphertext_plaintext_matrix_multiply(
-            context, plain_matrix_1, encrypted_matrix_2, result_matrix);
-
-        bool success_2 = ciphertext_plaintext_matrix_multiply(
-            context, plain_matrix_1, encrypted_matrix_2, result_matrix);
-        
-        auto end_time = chrono::high_resolution_clock::now();
-        auto duration = chrono::duration_cast<chrono::milliseconds>(end_time - start_time);
-        
-        if (!success) {
-            cerr << "矩阵乘法失败！" << endl;
-            return 1;
-        }
-        
-        cout << "矩阵乘法完成，耗时: " << duration.count() << " ms" << endl;
-        print_ciphertext_info(result_matrix, "结果密文矩阵");
-        
-        // 验证结果
-        cout << "\n=== 验证结果 ===" << endl;
-        
-        // 计算期望结果（明文计算）
-        vector<vector<uint64_t>> expected_result;
-        matrix_multiply_plain_blas(plain_matrix_1, plain_matrix_2, expected_result);
-        
-        print_matrix(expected_result, "期望结果矩阵");
-        
-        // 解密并验证结果
-        cout << "\n解密结果验证:" << endl;
-        bool all_correct = true;
-
-        vector<vector<uint64_t>> decrypted_result_matrix;
-        decrypt_ciphertexts_to_matrix(true, context, decryptor, result_matrix, decrypted_result_matrix);
-        print_matrix(decrypted_result_matrix, "解密结果矩阵");
-        
-        check_matrix_equal(expected_result, decrypted_result_matrix);
-
-        cout << "\n=== 测试完成 ===" << endl;
-        
     } catch (const exception& e) {
-        cerr << "错误: " << e.what() << endl;
-        return 1;
+        throw std::runtime_error("Error: " + string(e.what()));
     }
-    
-    return 0;
 }
 
 int test_ccmm() {
@@ -826,12 +798,7 @@ int main() {
         if (choice == "1") {
             cout << "\n开始测试 CPMM (密文-明文矩阵乘法)..." << endl;
             cout << "==========================================" << endl;
-            int result = test_cpmm();
-            if (result == 0) {
-                cout << "\nCPMM 测试成功完成！" << endl;
-            } else {
-                cout << "\nCPMM 测试失败！" << endl;
-            }
+            test_cpmm(false);
         }
         else if (choice == "2") {
             cout << "\n开始测试 CCMM (密文-密文矩阵乘法)..." << endl;

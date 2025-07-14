@@ -62,72 +62,64 @@ void convert_double_to_uint64_avx(const double* src, uint64_t* dst, size_t size)
 }
 #endif
 
-bool ciphertext_plaintext_matrix_multiply(
+vector<double> ciphertext_plaintext_matrix_multiply(
     const SEALContext& context,
     const vector<vector<uint64_t>>& plain_matrix,
     const vector<Ciphertext>& encrypted_matrix,
-    vector<Ciphertext>& result_matrix)
+    vector<Ciphertext>& result_matrix,
+    bool verbose)
 {
-    try {
-        cout << "\n=== 开始密文-明文矩阵乘法 ===" << endl;
-        
-        // 获取参数
+    try {        
         auto context_data = context.get_context_data(encrypted_matrix[0].parms_id());
         if (!context_data) {
             cerr << "Invalid context data" << endl;
-            return false;
+            throw std::runtime_error("Invalid context data");
         }
         
         size_t poly_modulus_degree = context_data->parms().poly_modulus_degree();
         size_t coeff_modulus_size = encrypted_matrix[0].coeff_modulus_size();
         
-        cout << "  多项式模数次数: " << poly_modulus_degree << endl;
-        cout << "  系数模数层数: " << coeff_modulus_size << endl;
+        if (verbose) {
+            cout << "  Polynomial modulus degree: " << poly_modulus_degree << endl;
+            cout << "  Coefficient modulus size: " << coeff_modulus_size << endl;
+        }
 
-        // 初始化结果矩阵
         result_matrix.resize(encrypted_matrix.size());
         
-        // 计时变量
-        double step1_time = 0;
-        double step2_time = 0;
-        double step3_time = 0;
+        double extract_time = 0;
+        double multiply_time = 0;
+        double repack_time = 0;
         
-        cout << "\n步骤1/3: 提取系数..." << endl;
+        if (verbose)
+            cout << "\nStep 1/3: Extract coefficients..." << endl;
         
-        // 步骤1: 从ciphertext矩阵每一行的ciphertext提取系数，组成矩阵
         vector<vector<vector<uint64_t>>> coeff_matrix_a, coeff_matrix_b;
         vector<uint64_t> modulus_vector;
-        step1_time += extract_coefficients_from_ciphertext_vector(context, encrypted_matrix, coeff_matrix_a, coeff_matrix_b, modulus_vector);
+        extract_time += extract_coefficients_from_ciphertext_vector(context, encrypted_matrix, coeff_matrix_a, coeff_matrix_b, modulus_vector, verbose);
                 
-        cout << "\n步骤2/3: 执行矩阵乘法..." << endl;
+        if (verbose)
+            cout << "\nStep 2/3: Execute matrix multiplication..." << endl;
         
-        // 步骤2: 对每个RNS片，计算plaintext matrix * a和plaintext matrix * b
         vector<vector<vector<uint64_t>>> result_a_matrix, result_b_matrix;
         
-        cout << "处理a矩阵..." << endl;
-        step2_time += Normal_RNS_multiply(plain_matrix, coeff_matrix_a, result_a_matrix, modulus_vector);
-        cout << "处理b矩阵..." << endl;
-        step2_time += Normal_RNS_multiply(plain_matrix, coeff_matrix_b, result_b_matrix, modulus_vector);
+        if (verbose)
+            cout << "Processing a matrix..." << endl;
+        multiply_time += Normal_RNS_multiply(plain_matrix, coeff_matrix_a, result_a_matrix, modulus_vector, verbose);
 
-        cout << "\n步骤3/3: 构建密文..." << endl;        
-        // 步骤3: 构建d个ciphertext，按行构建
-        step3_time += build_ciphertexts_from_result_matrices_2(context, result_a_matrix, result_b_matrix, result_matrix);
-        
-        cout << "\n[CPMM] ========== 密文-明文矩阵乘法时间统计 ==========" << endl;
-        cout << "Step 1 (提取系数): " << step1_time << " seconds" << endl;
-        cout << "Step 2 (矩阵乘法): " << step2_time << " seconds" << endl;
-        cout << "Step 3 (构建密文): " << step3_time << " seconds" << endl;
-        cout << "----------------------------------------" << endl;
-        cout << "总时间:              " << step1_time + step2_time + step3_time << " seconds" << endl;
-        cout << "=========================================" << endl;
-        
-        cout << "\n=== 密文-明文矩阵乘法完成 ===" << endl;
-        
-        return true;
+        if (verbose)
+            cout << "Processing b matrix..." << endl;
+        multiply_time += Normal_RNS_multiply(plain_matrix, coeff_matrix_b, result_b_matrix, modulus_vector, verbose);
+
+        if (verbose)
+            cout << "\nStep 3/3: Build ciphertexts..." << endl;        
+        repack_time += build_ciphertexts_from_result_matrices_2(context, result_a_matrix, result_b_matrix, result_matrix, verbose);
+
+        vector<double> time_vec = {extract_time, multiply_time, repack_time};
+        return time_vec;
     }
     catch (const exception& e) {
         cerr << "Error in ciphertext_plaintext_matrix_multiply: " << e.what() << endl;
-        return false;
+        throw std::runtime_error("Error in ciphertext_plaintext_matrix_multiply");
     }
 }
 
@@ -136,7 +128,8 @@ double extract_coefficients_from_ciphertext_vector(
     const vector<Ciphertext>& encrypted_vector,
     vector<vector<vector<uint64_t>>>& coeff_matrix_a,
     vector<vector<vector<uint64_t>>>& coeff_matrix_b,
-    vector<uint64_t>& modulus_vector)
+    vector<uint64_t>& modulus_vector,
+    bool verbose)
 {
     auto start_time = chrono::high_resolution_clock::now();
     if (encrypted_vector.empty()) {
@@ -156,8 +149,10 @@ double extract_coefficients_from_ciphertext_vector(
         return 0;
     }
     
-    cout << "开始提取系数..." << endl;
-    cout << "密文数量: " << num_ciphertexts << ", RNS层数: " << coeff_modulus_size << endl;
+    if (verbose) {
+        cout << "Extract coefficients..." << endl;
+        cout << "Number of ciphertexts: " << num_ciphertexts << ", RNS layers: " << coeff_modulus_size << endl;
+    }
     
     // 获取modulus vector
     auto coeff_modulus = context_data->parms().coeff_modulus();
@@ -165,12 +160,13 @@ double extract_coefficients_from_ciphertext_vector(
     for (size_t i = 0; i < coeff_modulus_size; i++) {
         modulus_vector[i] = coeff_modulus[i].value();
     }
-    // 打印modulus_vector
-    cout << "modulus_vector: ";
-    for (size_t i = 0; i < coeff_modulus_size; i++) {
-        cout << modulus_vector[i] << " ";
+    if (verbose) {
+        cout << "modulus_vector: ";
+        for (size_t i = 0; i < coeff_modulus_size; i++) {
+            cout << modulus_vector[i] << " ";
+        }
+        cout << endl;
     }
-    cout << endl;
     
     // 初始化系数矩阵 - 第一维是RNS层，第二维是密文索引，第三维是该密文在该RNS层上的系数
     coeff_matrix_a.resize(coeff_modulus_size);
@@ -207,9 +203,10 @@ double extract_coefficients_from_ciphertext_vector(
             }
         }
         
-        // 显示进度
-        cout << "\r提取系数进度: RNS层 " << (rns_layer + 1) << "/" << coeff_modulus_size 
-             << " [" << (rns_layer + 1) * 100 / coeff_modulus_size << "%]" << flush;
+        if (verbose) {
+            cout << "\rExtract coefficients progress: RNS layer " << (rns_layer + 1) << "/" << coeff_modulus_size 
+                 << " [" << (rns_layer + 1) * 100 / coeff_modulus_size << "%]" << flush;
+        }
     }
 
     auto end_time = chrono::high_resolution_clock::now();
@@ -222,7 +219,8 @@ double Normal_RNS_multiply(
     const vector<vector<uint64_t>>& plain_matrix,
     const vector<vector<vector<uint64_t>>>& coeff_matrix,
     vector<vector<vector<uint64_t>>>& result_matrix,
-    const vector<uint64_t>& modulus_vector)
+    const vector<uint64_t>& modulus_vector,
+    bool verbose)
 {
     if (plain_matrix.empty() || coeff_matrix.empty()) {
         cerr << "Empty matrices in multiplication" << endl;
@@ -238,14 +236,16 @@ double Normal_RNS_multiply(
         return 0;
     }
 
-    cout << "RNS层数: " << rns_layers << ", 矩阵大小: " << plain_rows << "x" << plain_cols << endl;
+    if (verbose)
+        cout << "RNS layers: " << rns_layers << ", matrix size: " << plain_rows << "x" << plain_cols << endl;
 
     double total_time = 0;
     result_matrix.resize(rns_layers);
 
     for (size_t rns_layer = 0; rns_layer < rns_layers; rns_layer++) {
-        cout << "\r处理RNS层: " << (rns_layer + 1) << "/" << rns_layers 
-             << " [" << (rns_layer + 1) * 100 / rns_layers << "%]" << flush;
+        if (verbose)
+            cout << "\rProcess RNS layer: " << (rns_layer + 1) << "/" << rns_layers 
+                 << " [" << (rns_layer + 1) * 100 / rns_layers << "%]" << flush;
 
         size_t matrix_rows = coeff_matrix[rns_layer].size();
         size_t matrix_cols = coeff_matrix[rns_layer][0].size();
@@ -254,7 +254,8 @@ double Normal_RNS_multiply(
             plain_matrix, 
             coeff_matrix[rns_layer], 
             result_matrix[rns_layer], 
-            modulus_vector[rns_layer]
+            modulus_vector[rns_layer],
+            verbose
         );
     }
 
@@ -265,7 +266,8 @@ double build_ciphertexts_from_result_matrices_2(
     const SEALContext& context,
     const vector<vector<vector<uint64_t>>>& result_a_matrix,
     const vector<vector<vector<uint64_t>>>& result_b_matrix,
-    vector<Ciphertext>& result_matrix)
+    vector<Ciphertext>& result_matrix,
+    bool verbose)
 {
     auto start_time = chrono::high_resolution_clock::now();
     if (result_a_matrix.empty() || result_b_matrix.empty()) {
@@ -289,14 +291,17 @@ double build_ciphertexts_from_result_matrices_2(
         return 0;
     }
     
-    cout << "开始构建密文..." << endl;
-    cout << "密文数量: " << num_ciphertexts << ", RNS层数: " << coeff_modulus_size << endl;
+    if (verbose) {
+        cout << "Build ciphertexts..." << endl;
+        cout << "Number of ciphertexts: " << num_ciphertexts << ", RNS layers: " << coeff_modulus_size << endl;
+    }
     
     // 对每个ciphertext位置构建密文
     for (size_t cipher_idx = 0; cipher_idx < num_ciphertexts; cipher_idx++) {
         // 显示进度
-        cout << "\r构建密文进度: " << (cipher_idx + 1) << "/" << num_ciphertexts 
-             << " [" << (cipher_idx + 1) * 100 / num_ciphertexts << "%]" << flush;
+        if (verbose)
+            cout << "\rBuild ciphertexts progress: " << (cipher_idx + 1) << "/" << num_ciphertexts 
+                 << " [" << (cipher_idx + 1) * 100 / num_ciphertexts << "%]" << flush;
         
         // 创建新的密文
         result_matrix[cipher_idx].resize(context, 2); // 2个多项式：a和b
@@ -323,8 +328,6 @@ double build_ciphertexts_from_result_matrices_2(
             }
         }
     }
-    
-    cout << "\n密文构建完成！" << endl;
 
     auto end_time = chrono::high_resolution_clock::now();
     auto total_time = chrono::duration_cast<chrono::duration<double>>(end_time - start_time);
@@ -607,7 +610,8 @@ double matrix_multiply_plain_blas(
     const vector<vector<uint64_t>>& A,
     const vector<vector<uint64_t>>& B,
     vector<vector<uint64_t>>& C,
-    uint64_t modulus)
+    uint64_t modulus,
+    bool verbose)
 {
     chrono::duration<double> convert_time(0);
     chrono::duration<double> blas_time(0);
@@ -714,7 +718,8 @@ double matrix_multiply_plain_blas(
     auto mod_end = chrono::high_resolution_clock::now();
     mod_time = chrono::duration<double>(mod_end - mod_start);
 
-    cout << "convert_time: " << convert_time.count() << " | blas_time: " << blas_time.count() << " | mod_time: " << mod_time.count() << endl;
+    if (verbose)
+        cout << "convert_time: " << convert_time.count() << " | blas_time: " << blas_time.count() << " | mod_time: " << mod_time.count() << endl;
 
     return convert_time.count() + blas_time.count() + mod_time.count();
 }
@@ -723,7 +728,8 @@ double matrix_multiply_plain_blas(
 double matrix_multiply_plain_blas(
     const vector<vector<uint64_t>>& A,
     const vector<vector<uint64_t>>& B,
-    vector<vector<uint64_t>>& C)
+    vector<vector<uint64_t>>& C,
+    bool verbose)
 {
     chrono::duration<double> convert_time(0);
     chrono::duration<double> blas_time(0);
@@ -814,7 +820,8 @@ double matrix_multiply_plain_blas(
     auto convert_end2 = chrono::high_resolution_clock::now();
     convert_time += chrono::duration<double>(convert_end2 - convert_start2);
 
-    cout << "convert_time: " << convert_time.count() << " | blas_time: " << blas_time.count() << endl;
+    if (verbose)
+        cout << "convert_time: " << convert_time.count() << " | blas_time: " << blas_time.count() << endl;
 
     return convert_time.count() + blas_time.count();
 }

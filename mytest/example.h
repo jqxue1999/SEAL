@@ -39,9 +39,10 @@ vector<int> get_coeff_modulus_params(const json& config, size_t poly_modulus_deg
 
 /**
  * 测试CPMM（Ciphertext-Plaintext Matrix Multiplication）功能
+ * @param verbose 是否显示详细输出
  * @return 成功返回0，失败返回1
  */
-int test_cpmm();
+void test_cpmm(bool verbose = false);
 
 /**
  * 测试CCMM（Ciphertext-Ciphertext Matrix Multiplication）功能

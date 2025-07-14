@@ -32,16 +32,18 @@ using namespace std;
  * 执行密文矩阵与明文矩阵的乘法
  * 
  * @param context SEAL上下文
- * @param encrypted_matrix 1×d的密文向量，每个密文编码一个矩阵行
- * @param plain_matrix d×d的明文矩阵
- * @param result_matrix 1×d的结果密文向量
- * @return 成功返回true，失败返回false
+ * @param plain_matrix 明文矩阵
+ * @param encrypted_matrix 密文矩阵
+ * @param result_matrix 结果密文矩阵
+ * @param verbose 是否显示详细输出
+ * @return 时间向量 [extract_time, multiply_time, repack_time]
  */
-bool ciphertext_plaintext_matrix_multiply(
+vector<double> ciphertext_plaintext_matrix_multiply(
     const SEALContext& context,
     const vector<vector<uint64_t>>& plain_matrix,
     const vector<Ciphertext>& encrypted_matrix,
-    vector<Ciphertext>& result_matrix);
+    vector<Ciphertext>& result_matrix,
+    bool verbose = false);
 
 /**
  * 从密文向量中提取系数矩阵
@@ -51,13 +53,16 @@ bool ciphertext_plaintext_matrix_multiply(
  * @param coeff_matrix_a 提取的a多项式系数矩阵 [RNS层][密文索引][多项式系数]
  * @param coeff_matrix_b 提取的b多项式系数矩阵 [RNS层][密文索引][多项式系数]
  * @param modulus_vector 每个RNS层的模数
+ * @param verbose 是否显示详细输出
+ * @return 提取时间
  */
 double extract_coefficients_from_ciphertext_vector(
     const SEALContext& context,
     const vector<Ciphertext>& encrypted_vector,
     vector<vector<vector<uint64_t>>>& coeff_matrix_a,
     vector<vector<vector<uint64_t>>>& coeff_matrix_b,
-    vector<uint64_t>& modulus_vector);
+    vector<uint64_t>& modulus_vector,
+    bool verbose = false);
 
 /**
  * 从结果矩阵构建密文向量
@@ -66,12 +71,15 @@ double extract_coefficients_from_ciphertext_vector(
  * @param result_a_matrix 结果a矩阵 [RNS层][行][列]
  * @param result_b_matrix 结果b矩阵 [RNS层][行][列]
  * @param result_matrix 输出的密文向量
+ * @param verbose 是否显示详细输出
+ * @return 构建时间
  */
 double build_ciphertexts_from_result_matrices_2(
     const SEALContext& context,
     const vector<vector<vector<uint64_t>>>& result_a_matrix,
     const vector<vector<vector<uint64_t>>>& result_b_matrix,
-    vector<Ciphertext>& result_matrix);
+    vector<Ciphertext>& result_matrix,
+    bool verbose = false);
 
 /**
  * 将向量编码到明文多项式系数上
@@ -130,24 +138,34 @@ void decrypt_ciphertexts_to_matrix(
     vector<vector<uint64_t>>& plain_matrix);
 
 /**
- * 计算明文矩阵乘法 C = A * B
+ * 计算明文矩阵乘法 C = A * B (带模运算)
  * @param A 左矩阵
  * @param B 右矩阵
  * @param C 结果矩阵
- * @param modulus 若非0则对结果取模
+ * @param modulus 模数
+ * @param verbose 是否显示详细输出
+ * @return 计算时间
  */
-
 double matrix_multiply_plain_blas(
     const vector<vector<uint64_t>>& A,
     const vector<vector<uint64_t>>& B,
     vector<vector<uint64_t>>& C,
-    uint64_t modulus);
+    uint64_t modulus,
+    bool verbose = false);
 
+/**
+ * 计算明文矩阵乘法 C = A * B (不带模运算)
+ * @param A 左矩阵
+ * @param B 右矩阵
+ * @param C 结果矩阵
+ * @param verbose 是否显示详细输出
+ * @return 计算时间
+ */
 double matrix_multiply_plain_blas(
     const vector<vector<uint64_t>>& A,
     const vector<vector<uint64_t>>& B,
-    vector<vector<uint64_t>>& C);
-
+    vector<vector<uint64_t>>& C,
+    bool verbose = false);
 
 /**
  * 对单个系数矩阵进行RNS层矩阵乘法
@@ -156,11 +174,14 @@ double matrix_multiply_plain_blas(
  * @param coeff_matrix 系数矩阵 [RNS层][行][列]
  * @param result_matrix 结果矩阵 [RNS层][行][列]
  * @param modulus_vector 每个RNS层的模数
+ * @param verbose 是否显示详细输出
+ * @return 计算时间
  */
 double Normal_RNS_multiply(
     const vector<vector<uint64_t>>& plain_matrix,
     const vector<vector<vector<uint64_t>>>& coeff_matrix,
     vector<vector<vector<uint64_t>>>& result_matrix,
-    const vector<uint64_t>& modulus_vector);
+    const vector<uint64_t>& modulus_vector,
+    bool verbose = false);
 
 #endif // CPMM_H
