@@ -20,7 +20,7 @@ using namespace std;
  * @param verbose 是否显示详细输出
  * @return 提取时间（秒）
  */
-double extract_coefficients_from_single_ciphertext(
+double extract_coefficients_matrix_from_single_ciphertext(
     const SEALContext& context,
     const Ciphertext& encrypted,
     vector<vector<uint64_t>>& coeff_matrix_a,

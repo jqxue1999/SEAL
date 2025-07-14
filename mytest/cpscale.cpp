@@ -11,7 +11,7 @@ using namespace seal;
 using namespace std;
 using namespace seal::util;
 
-double extract_coefficients_from_single_ciphertext(
+double extract_coefficients_matrix_from_single_ciphertext(
     const SEALContext& context,
     const Ciphertext& encrypted,
     vector<vector<uint64_t>>& coeff_matrix_a,
@@ -261,7 +261,7 @@ vector<double> scale_vector_blas(
 {
     vector<vector<uint64_t>> coeff_matrix_a, coeff_matrix_b;
     vector<uint64_t> modulus_vector;
-    double extract_time = extract_coefficients_from_single_ciphertext(context, encrypted, coeff_matrix_a, coeff_matrix_b, modulus_vector, verbose);
+    double extract_time = extract_coefficients_matrix_from_single_ciphertext(context, encrypted, coeff_matrix_a, coeff_matrix_b, modulus_vector, verbose);
 
     double multiply_time = scale_coefficients_blas(coeff_matrix_a, coeff_matrix_b, modulus_vector, scale, verbose);
 
@@ -299,7 +299,7 @@ vector<double> vector_vector_outer_multiply_blas(
     vector<uint64_t> modulus_vector;
     
     // 只提取一次系数
-    double extract_time = extract_coefficients_from_single_ciphertext(
+    double extract_time = extract_coefficients_matrix_from_single_ciphertext(
         context, encrypted, coeff_matrix_a, coeff_matrix_b, modulus_vector, false);
     total_extract_time = extract_time;
     
