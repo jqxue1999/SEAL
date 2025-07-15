@@ -6,28 +6,19 @@ void decompose_to_bit_vectors(
     const vector<uint64_t>& input_vector,
     vector<vector<uint64_t>>& bit_vectors,
     int num_bits)
-{
-    if (input_vector.empty()) {
-        cerr << "输入向量为空" << endl;
-        return;
-    }
-    
+{    
     size_t vector_size = input_vector.size();
     
-    // 初始化64个位级向量
     bit_vectors.resize(num_bits);
     for (int bit = 0; bit < num_bits; bit++) {
         bit_vectors[bit].resize(vector_size, 0);
     }
     
-    // 对每个输入整数，提取其64位（并行化）
     #pragma omp parallel for
     for (size_t i = 0; i < vector_size; i++) {
         uint64_t value = input_vector[i];
         
-        // 提取每一位
         for (int bit = 0; bit < num_bits; bit++) {
-            // 使用位掩码提取第bit位
             uint64_t bit_value = (value >> bit) & 1;
             bit_vectors[bit][i] = bit_value;
         }
@@ -76,34 +67,17 @@ void encrypt_bit_vectors(
     const vector<vector<uint64_t>>& bit_vectors,
     vector<Ciphertext>& encrypted_bit_vectors,
     int num_bits)
-{
-    if (bit_vectors.empty()) {
-        cerr << "位级向量为空" << endl;
-        return;
-    }
-    
+{   
     auto context_data = context.get_context_data(context.first_parms_id());
     size_t poly_modulus_degree = context_data->parms().poly_modulus_degree();
         
-    // 初始化加密向量数组 - 64个Ciphertext，每个对应一个位级
     encrypted_bit_vectors.resize(num_bits);
     
-    // 对每个位级向量进行加密
     for (int bit = 0; bit < num_bits; bit++) {
         const vector<uint64_t>& bit_vector = bit_vectors[bit];
         
-        // 检查向量大小是否匹配多项式模数次数
-        if (bit_vector.size() != poly_modulus_degree) {
-            cerr << "\n错误: 位级向量 " << bit << " 的大小 (" << bit_vector.size() 
-                 << ") 与多项式模数次数 (" << poly_modulus_degree << ") 不匹配" << endl;
-            return;
-        }
-        
-        // 编码为明文多项式
         Plaintext plaintext;
         encode_vector_to_plaintext(bit_vector, context, plaintext);
-        
-        // 加密
         encryptor.encrypt(plaintext, encrypted_bit_vectors[bit]);
     }
 }
@@ -207,56 +181,54 @@ vector<int> decompose_to_powers_of_2(uint64_t value) {
     return powers;
 }
 
-void multiply_by_general_scalar(
+double initialize_zero_ciphertext(
     const SEALContext& context,
     Encryptor& encryptor,
-    Evaluator& evaluator,
-    const vector<Ciphertext>& encrypted_bit_vectors,
-    uint64_t multiplier,
-    vector<Ciphertext>& result_vectors,
-    int num_bits)
+    Ciphertext& zero_ciphertext)
 {
-    if (encrypted_bit_vectors.empty()) {
-        cerr << "加密的位级向量为空" << endl;
-        return;
-    }
-
-    // 分解乘数为2的幂次方之和
     auto start = chrono::high_resolution_clock::now();
-    vector<int> powers = decompose_to_powers_of_2(multiplier);
-    cout << "乘数" << multiplier << "分解为: ";
-    for (size_t i = 0; i < powers.size(); i++) {
-        cout << "2^" << powers[i];
-        if (i < powers.size() - 1) cout << " + ";
-    }
-    cout << endl;
-    auto end = chrono::high_resolution_clock::now();
-    auto step_1_duration = chrono::duration_cast<chrono::microseconds>(end - start);
-    
-    // 初始化全零密文（只在需要时用）
-    start = chrono::high_resolution_clock::now();
     auto context_data = context.get_context_data(context.first_parms_id());
     size_t poly_modulus_degree = context_data->parms().poly_modulus_degree();
     vector<uint64_t> zero_vector(poly_modulus_degree, 0);
     Plaintext zero_plaintext;
     encode_vector_to_plaintext(zero_vector, context, zero_plaintext);
-    Ciphertext zero_ciphertext;
     encryptor.encrypt(zero_plaintext, zero_ciphertext);
-    end = chrono::high_resolution_clock::now();
-    auto step_2_duration = chrono::duration_cast<chrono::microseconds>(end - start);
+    auto end = chrono::high_resolution_clock::now();
+
+    auto duration = chrono::duration<double>(end - start);
+
+    return duration.count();
+}
+
+vector<double> multiply_by_general_scalar(
+    const SEALContext& context,
+    Encryptor& encryptor,
+    Evaluator& evaluator,
+    const Ciphertext& zero_ciphertext,
+    const vector<Ciphertext>& encrypted_bit_vectors,
+    uint64_t multiplier,
+    vector<Ciphertext>& result_vectors,
+    int num_bits,
+    bool verbose)
+{
+    auto start = chrono::high_resolution_clock::now();
+    vector<int> powers = decompose_to_powers_of_2(multiplier);
+    if (verbose) {
+        cout << "Multiplier " << multiplier << " decomposed to: ";
+        for (size_t i = 0; i < powers.size(); i++) {
+            cout << "2^" << powers[i];
+            if (i < powers.size() - 1) cout << " + ";
+        }
+        cout << endl;
+    }
+    auto end = chrono::high_resolution_clock::now();
+    auto step_1_duration = chrono::duration<double>(end - start);
     
     start = chrono::high_resolution_clock::now();
     result_vectors.resize(num_bits);
     if (powers.empty()) {
-        // multiplier为0，全部置零
         for (int bit = 0; bit < num_bits; bit++)
             result_vectors[bit] = zero_ciphertext;
-        end = chrono::high_resolution_clock::now();
-        auto step_3_duration = chrono::duration_cast<chrono::microseconds>(end - start);
-        cout << "乘以" << multiplier << "操作完成！耗时: " << step_1_duration.count() << " + " 
-        << step_2_duration.count() << " + " << step_3_duration.count() << " = " << 
-        step_1_duration.count() + step_2_duration.count() + step_3_duration.count() << " microseconds" << endl;
-        cout << "add_inplace 操作次数: 0" << endl;
     } else {
         int p_min = *min_element(powers.begin(), powers.end());
         for (int target_bit = 0; target_bit < num_bits; target_bit++) {
@@ -267,7 +239,6 @@ void multiply_by_general_scalar(
                 result_vectors[target_bit] = zero_ciphertext;
             }
         }
-        // 对剩下的 powers 做 add_inplace
         int number_of_add_inplace = 0;
         for (int target_bit = 0; target_bit < num_bits; target_bit++) {
             for (int power : powers) {
@@ -279,15 +250,10 @@ void multiply_by_general_scalar(
                 }
             }
         }
-        end = chrono::high_resolution_clock::now();
-        auto step_3_duration = chrono::duration_cast<chrono::microseconds>(end - start);
-        cout << "乘以" << multiplier << "操作完成！耗时: " << step_1_duration.count() << " + " 
-        << step_2_duration.count() << " + " << step_3_duration.count() << " = " << 
-        step_1_duration.count() + step_2_duration.count() + step_3_duration.count() << " microseconds" << endl;
-        cout << "add_inplace 操作次数: " << number_of_add_inplace << endl;
     }
-    
-    return;
+    end = chrono::high_resolution_clock::now();
+    auto step_2_duration = chrono::duration<double>(end - start);
+    return {step_1_duration.count(), step_2_duration.count()};
 }
 
 bool verify_general_multiplication(
@@ -321,3 +287,33 @@ bool verify_general_multiplication(
     
     return all_correct;
 } 
+
+vector<double> clear_vector_outer_product_with_encrypted_bits(
+    const SEALContext& context,
+    Encryptor& encryptor,
+    Evaluator& evaluator,
+    Decryptor& decryptor,
+    int num_bits,
+    const vector<uint64_t>& clear_vector,
+    const vector<uint64_t>& plain_vector,
+    const vector<Ciphertext>& bit_vectors_ciphertext,
+    vector<vector<Ciphertext>>& outer_product_results,
+    bool verbose)
+{
+    size_t poly_modulus_degree = clear_vector.size();
+    double zero_ciphertext_time = 0, decompose_time = 0, multiply_time = 0;
+
+    Ciphertext zero_ciphertext;
+    zero_ciphertext_time += initialize_zero_ciphertext(context, encryptor, zero_ciphertext);
+
+    for (size_t i = 0; i < clear_vector.size(); ++i) {
+        uint64_t scalar = clear_vector[i];
+        vector<Ciphertext> result_vectors;
+        vector<double> time_vec = multiply_by_general_scalar(context, encryptor, evaluator, zero_ciphertext, bit_vectors_ciphertext, scalar, result_vectors, num_bits);
+        decompose_time += time_vec[0];
+        multiply_time += time_vec[1];
+        outer_product_results.push_back(result_vectors);
+    }
+
+    return {zero_ciphertext_time, decompose_time, multiply_time};
+}

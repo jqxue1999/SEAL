@@ -103,24 +103,39 @@ void multiply_by_power_of_2(
 vector<int> decompose_to_powers_of_2(uint64_t value);
 
 /**
+ * 初始化全零密文
+ * 
+ * @param context SEAL上下文
+ * @param encryptor 加密器
+ * @param zero_ciphertext 全零密文
+ */
+double initialize_zero_ciphertext(
+    const SEALContext& context,
+    Encryptor& encryptor,
+    Ciphertext& zero_ciphertext);
+
+/**
  * 对加密的位级向量执行通用标量乘法
  * 通过分解乘数为2的幂次方之和，然后相加
  * 
  * @param context SEAL上下文
  * @param encryptor 加密器
  * @param evaluator 计算器（用于密文加法）
+ * @param zero_ciphertext 全零密文
  * @param encrypted_bit_vectors 加密的位级向量数组（64个Ciphertext）
  * @param multiplier 乘数
  * @param result_vectors 结果向量数组（64个Ciphertext）
  */
-void multiply_by_general_scalar(
+vector<double> multiply_by_general_scalar(
     const SEALContext& context,
     Encryptor& encryptor,
     Evaluator& evaluator,
+    const Ciphertext& zero_ciphertext,
     const vector<Ciphertext>& encrypted_bit_vectors,
     uint64_t multiplier,
     vector<Ciphertext>& result_vectors,
-    int num_bits = 64);
+    int num_bits,
+    bool verbose = false);
 
 /**
  * 验证通用向量乘法的正确性
@@ -134,5 +149,32 @@ bool verify_general_multiplication(
     const vector<uint64_t>& input_vector,
     uint64_t multiplier,
     const vector<uint64_t>& output_vector);
+
+/**
+ * 计算明文向量和密文bit向量的外积，并验证正确性，返回是否全部正确
+ * 
+ * @param context SEAL上下文
+ * @param encryptor 加密器
+ * @param evaluator 计算器
+ * @param decryptor 解密器
+ * @param num_bits 位数
+ * @param clear_vector 明文向量
+ * @param plain_vector 明文向量
+ * @param bit_vectors_ciphertext 密文bit向量
+ * @param outer_product_results 外积结果
+ * @param verbose 是否打印详细信息
+ * @return 时间消耗
+ */
+vector<double> clear_vector_outer_product_with_encrypted_bits(
+    const SEALContext& context,
+    Encryptor& encryptor,
+    Evaluator& evaluator,
+    Decryptor& decryptor,
+    int num_bits,
+    const vector<uint64_t>& clear_vector,
+    const vector<uint64_t>& plain_vector,
+    const vector<Ciphertext>& bit_vectors_ciphertext,
+    vector<vector<Ciphertext>>& outer_product_results,
+    bool verbose = false);
 
 #endif // DIGITS_H 

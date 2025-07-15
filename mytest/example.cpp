@@ -95,8 +95,9 @@ void print_menu() {
     cout << "4. General Multiplication & Carry Recovery - 通用乘法和进位恢复" << endl;
     cout << "5. Ciphertext Scale Multiplication - 密文scale乘法" << endl;
     cout << "6. Vector-Vector Multiplication - 明文vector外乘密文vector" << endl;
-    cout << "7. 退出程序" << endl;
-    cout << "请输入选择 (1-7): ";
+    cout << "7. Digits CVPV - 明文vector外乘密文vector" << endl;
+    cout << "8. 退出程序" << endl;
+    cout << "请输入选择 (1-9): ";
 }
 
 void test_cpmm(bool verbose) {
@@ -515,23 +516,22 @@ int test_CMT() {
     return 0;
 }
 
-int test_general_multiplication(int num_bits) {
+int test_digits_cvps(int num_bits) {
     try {
-        // 读取配置文件
         json config = read_seal_config();
         if (config.empty()) {
             cerr << "无法读取配置文件，使用默认参数" << endl;
             return 1;
         }
-        // 获取用户输入的多项式模数次数
+
         size_t poly_modulus_degree = get_user_poly_modulus_degree(config);
-        // 获取对应的系数模数参数
+
         vector<int> coeff_modulus_params = get_coeff_modulus_params(config, poly_modulus_degree);
         if (coeff_modulus_params.empty()) {
             cerr << "无法获取系数模数参数" << endl;
             return 1;
         }
-        // 设置加密参数
+
         scheme_type scheme = scheme_type::bfv;
         EncryptionParameters parms(scheme);
         parms.set_poly_modulus_degree(poly_modulus_degree);
@@ -546,7 +546,7 @@ int test_general_multiplication(int num_bits) {
         }
         SEALContext context(parms);
         print_parameters(context);
-        // 生成密钥
+
         KeyGenerator keygen(context);
         SecretKey secret_key = keygen.secret_key();
         PublicKey public_key;
@@ -558,7 +558,7 @@ int test_general_multiplication(int num_bits) {
         cout << "多项式模数次数: " << poly_modulus_degree << endl;
         cout << "系数模数层数: " << parms.coeff_modulus().size() << endl;
         cout << "位数: " << num_bits << endl;
-        // 创建测试向量
+
         cout << "\n=== 创建测试向量 ===" << endl;
         vector<uint64_t> input_vector(poly_modulus_degree);
         for (size_t i = 0; i < poly_modulus_degree; i++) {
@@ -575,10 +575,15 @@ int test_general_multiplication(int num_bits) {
             cout << "\n=== 测试乘以" << multiplier << " ===" << endl;
             vector<vector<uint64_t>> bit_vectors;
             decompose_to_bit_vectors(input_vector, bit_vectors, num_bits);
+
             vector<Ciphertext> encrypted_bit_vectors;
             encrypt_bit_vectors(context, encryptor, bit_vectors, encrypted_bit_vectors, num_bits);
+
+            Ciphertext zero_ciphertext;
+            initialize_zero_ciphertext(context, encryptor, zero_ciphertext);
+
             vector<Ciphertext> result_vectors;
-            multiply_by_general_scalar(context, encryptor, evaluator, encrypted_bit_vectors, multiplier, result_vectors, num_bits);
+            multiply_by_general_scalar(context, encryptor, evaluator, zero_ciphertext, encrypted_bit_vectors, multiplier, result_vectors, num_bits);
             vector<vector<uint64_t>> decrypted_bit_vectors;
             decrypt_bit_vectors(context, decryptor, result_vectors, decrypted_bit_vectors, num_bits);
             vector<uint64_t> output_vector;
@@ -591,6 +596,97 @@ int test_general_multiplication(int num_bits) {
             cout << "✓ 乘以" << multiplier << "测试成功！" << endl;
         }
         cout << "\n=== 通用向量乘法测试完成 ===" << endl;
+    } catch (const exception& e) {
+        cerr << "错误: " << e.what() << endl;
+        return 1;
+    }
+    return 0;
+}
+
+
+int test_digits_cvpv(int num_bits, bool check_correctness) {
+    try {
+        json config = read_seal_config();
+        if (config.empty()) {
+            cerr << "Cannot read config file" << endl;
+            return 1;
+        }
+
+        for (size_t poly_modulus_degree : {4096, 8192, 16384}) {
+            vector<int> coeff_modulus_params = get_coeff_modulus_params(config, poly_modulus_degree);
+            if (coeff_modulus_params.empty()) {
+                cerr << "Cannot get coeff modulus params" << endl;
+                return 1;
+            }
+
+            scheme_type scheme = scheme_type::bfv;
+            EncryptionParameters parms(scheme);
+            parms.set_poly_modulus_degree(poly_modulus_degree);
+            parms.set_coeff_modulus(CoeffModulus::Create(poly_modulus_degree, coeff_modulus_params));
+            parms.set_plain_modulus(PlainModulus::Batching(poly_modulus_degree, 20));
+            uint64_t plain_modulus_value = 1 << num_bits;
+            cout << "plain_modulus_value: " << plain_modulus_value << endl;
+
+            SEALContext context(parms);
+            print_parameters(context);
+
+            KeyGenerator keygen(context);
+            SecretKey secret_key = keygen.secret_key();
+            PublicKey public_key;
+            keygen.create_public_key(public_key);
+            Encryptor encryptor(context, public_key);
+            Decryptor decryptor(context, secret_key);
+            Evaluator evaluator(context);
+
+            double zero_ciphertext_time, decompose_time, multiply_time = 0;
+            int nums_run = 100;
+            for (int run = 0; run < nums_run; run++) {
+                vector<uint64_t> clear_vector(poly_modulus_degree);
+                for (size_t i = 0; i < poly_modulus_degree; i++)
+                    clear_vector[i] = rand() % 2;
+
+                vector<uint64_t> plain_vector(poly_modulus_degree);
+                for (size_t i = 0; i < poly_modulus_degree; i++)
+                    plain_vector[i] = rand() % 2;
+
+                vector<vector<uint64_t>> bit_vectors_plaintext;
+                decompose_to_bit_vectors(plain_vector, bit_vectors_plaintext, num_bits);
+
+                vector<Ciphertext> encrypted_bit_vectors;
+                encrypt_bit_vectors(context, encryptor, bit_vectors_plaintext, encrypted_bit_vectors, num_bits);
+
+                vector<vector<Ciphertext>> outer_product_results;
+                vector<double> time_vec = clear_vector_outer_product_with_encrypted_bits(
+                    context, encryptor, evaluator, decryptor, num_bits, clear_vector, plain_vector, encrypted_bit_vectors, outer_product_results, check_correctness);
+
+                zero_ciphertext_time += time_vec[0];
+                decompose_time += time_vec[1];
+                multiply_time += time_vec[2];
+
+                if (check_correctness) {
+                    for (size_t i = 0; i < clear_vector.size(); ++i) {
+                        uint64_t scalar = clear_vector[i];
+                        vector<uint64_t> expected(poly_modulus_degree);
+                        for (size_t j = 0; j < poly_modulus_degree; ++j) {
+                            expected[j] = (scalar * plain_vector[j]) % plain_modulus_value;
+                        }
+                        vector<vector<uint64_t>> decrypted_bit_vectors;
+                        decrypt_bit_vectors(context, decryptor, outer_product_results[i], decrypted_bit_vectors, num_bits);
+                        vector<uint64_t> output_vector;
+                        compose_from_bit_vectors(decrypted_bit_vectors, output_vector, num_bits);
+                        for (size_t j = 0; j < poly_modulus_degree; ++j) {
+                            if (output_vector[j] != expected[j]) {
+                                throw runtime_error("Verification failed!");
+                            }
+                        }
+                    }                        
+                }
+            }
+            cout << "\033[33mZero ciphertext time: " << zero_ciphertext_time * 1000 / nums_run << " ms\033[0m" << endl;
+            cout << "\033[33mDecompose time: " << decompose_time * 1000 / nums_run << " ms\033[0m" << endl;
+            cout << "\033[33mMultiply time: " << multiply_time * 1000 / nums_run << " ms\033[0m" << endl;
+            cout << "\033[32mTotal time: " << (zero_ciphertext_time + decompose_time + multiply_time) * 1000 / nums_run << " ms\033[0m" << endl;
+        }
     } catch (const exception& e) {
         cerr << "错误: " << e.what() << endl;
         return 1;
@@ -828,7 +924,7 @@ int main() {
             cout << "请输入要测试的bit宽度（如8、16、32、64等）: ";
             cin >> num_bits;
             cin.ignore();
-            int result = test_general_multiplication(num_bits);
+            int result = test_digits_cvps(num_bits);
             if (result == 0)
                 cout << "\n通用乘法测试成功完成！（bit宽度=" << num_bits << ")" << endl;
             else
@@ -845,11 +941,30 @@ int main() {
             test_vector_vector_outer_multiplication(false);
         }
         else if (choice == "7") {
+            cout << "\ntest_digits_cvpv..." << endl;
+            cout << "==========================================" << endl;
+            
+            int num_bits = 64;
+            cout << "Input num_bits: ";
+            cin >> num_bits;
+
+            bool check_correctness;
+            cout << "Input check_correctness: ";
+            cin >> check_correctness;
+            cin.ignore();
+            
+            int result = test_digits_cvpv(num_bits, check_correctness);
+            if (result == 0)
+                cout << "\n通用乘法测试成功完成！（bit宽度=" << num_bits << ")" << endl;
+            else
+                cout << "\n通用乘法测试失败！（bit宽度=" << num_bits << ")" << endl;
+        }
+        else if (choice == "8") {
             cout << "程序退出。" << endl;
             break;
         }
         else {
-            cout << "无效选择，请输入 1、2、3、4、5、6、7。" << endl;
+            cout << "无效选择，请输入 1、2、3、4、5、6、7、8。" << endl;
         }
         
         cout << "\n按回车键继续...";
