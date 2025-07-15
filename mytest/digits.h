@@ -188,4 +188,15 @@ double clear_vector_times_encrypted_matrix(
     int num_bits,
     bool verbose = false);
 
+// 计算密文矩阵（按行密文bit向量）与明文矩阵的乘积，结果为密文bit向量矩阵
+double encrypted_matrix_times_clear_matrix(
+    const SEALContext& context,
+    Encryptor& encryptor,
+    Evaluator& evaluator,
+    const vector<vector<Ciphertext>>& encrypted_matrix,
+    const vector<vector<uint64_t>>& clear_matrix,
+    vector<vector<Ciphertext>>& result,
+    int num_bits,
+    bool verbose = false);
+
 #endif // DIGITS_H 

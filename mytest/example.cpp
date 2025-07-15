@@ -98,7 +98,8 @@ void print_menu() {
     cout << "7. Digits CVPV - 明文vector外乘密文vector" << endl;
     cout << "8. Digits PVCM - 明文vector乘密文矩阵" << endl;
     cout << "9. 退出程序" << endl;
-    cout << "请输入选择 (1-9): ";
+    cout << "10. Encrypted Matrix × Clear Matrix - 密文矩阵乘明文矩阵" << endl;
+    cout << "请输入选择 (1-10): ";
 }
 
 void test_cpmm(bool verbose) {
@@ -777,6 +778,95 @@ int test_digits_pvcm(int num_bits, bool check_correctness) {
     return 0;
 }
 
+int test_encrypted_matrix_times_clear_matrix(int num_bits, bool check_correctness) {
+    try {
+        json config = read_seal_config();
+        if (config.empty()) {
+            cerr << "Cannot read config file" << endl;
+            return 1;
+        }
+
+        for (size_t poly_modulus_degree : {4096, 8192, 16384}) {
+            vector<int> coeff_modulus_params = get_coeff_modulus_params(config, poly_modulus_degree);
+            if (coeff_modulus_params.empty()) {
+                cerr << "Cannot get coeff modulus params" << endl;
+                return 1;
+            }
+
+            scheme_type scheme = scheme_type::bfv;
+            EncryptionParameters parms(scheme);
+            parms.set_poly_modulus_degree(poly_modulus_degree);
+            parms.set_coeff_modulus(CoeffModulus::Create(poly_modulus_degree, coeff_modulus_params));
+            parms.set_plain_modulus(PlainModulus::Batching(poly_modulus_degree, 20));
+            uint64_t plain_modulus_value = 1 << num_bits;
+            cout << "plain_modulus_value: " << plain_modulus_value << endl;
+
+            SEALContext context(parms);
+            print_parameters(context);
+
+            KeyGenerator keygen(context);
+            SecretKey secret_key = keygen.secret_key();
+            PublicKey public_key;
+            keygen.create_public_key(public_key);
+            Encryptor encryptor(context, public_key);
+            Decryptor decryptor(context, secret_key);
+            Evaluator evaluator(context);
+
+            int nums_run = 3;
+            double total_time = 0;
+            for (int run = 0; run < nums_run; run++) {
+                vector<vector<uint64_t>> plain_matrix_A(poly_modulus_degree, vector<uint64_t>(poly_modulus_degree));
+                vector<vector<uint64_t>> plain_matrix_B(poly_modulus_degree, vector<uint64_t>(poly_modulus_degree));
+                for (size_t i = 0; i < poly_modulus_degree; i++) {
+                    for (size_t j = 0; j < poly_modulus_degree; j++) {
+                        plain_matrix_A[i][j] = rand() % 2;
+                        plain_matrix_B[i][j] = rand() % 2;
+                    }
+                }
+                // digit分解并加密A的每一行
+                vector<vector<Ciphertext>> encrypted_matrix_A(poly_modulus_degree);
+                for (size_t i = 0; i < poly_modulus_degree; i++) {
+                    vector<vector<uint64_t>> bit_vectors_plaintext;
+                    decompose_to_bit_vectors(plain_matrix_A[i], bit_vectors_plaintext, num_bits);
+                    encrypt_bit_vectors(context, encryptor, bit_vectors_plaintext, encrypted_matrix_A[i], num_bits);
+                }
+                // 计算密文矩阵A * 明文矩阵B
+                vector<vector<Ciphertext>> result;
+                total_time += encrypted_matrix_times_clear_matrix(context, encryptor, evaluator, encrypted_matrix_A, plain_matrix_B, result, num_bits, false);
+                if (check_correctness) {
+                    // 明文结果
+                    vector<vector<uint64_t>> expected(poly_modulus_degree, vector<uint64_t>(poly_modulus_degree, 0));
+                    for (size_t i = 0; i < poly_modulus_degree; i++) {
+                        for (size_t j = 0; j < poly_modulus_degree; j++) {
+                            for (size_t k = 0; k < poly_modulus_degree; k++) {
+                                expected[i][j] = (expected[i][j] + plain_matrix_A[i][k] * plain_matrix_B[k][j]) % plain_modulus_value;
+                            }
+                        }
+                    }
+                    // 解密并比对
+                    for (size_t i = 0; i < poly_modulus_degree; i++) {
+                        vector<vector<uint64_t>> decrypted_bit_vectors;
+                        decrypt_bit_vectors(context, decryptor, result[i], decrypted_bit_vectors, num_bits);
+                        vector<uint64_t> output_vector;
+                        compose_from_bit_vectors(decrypted_bit_vectors, output_vector, num_bits, plain_modulus_value);
+                        for (size_t j = 0; j < poly_modulus_degree; j++) {
+                            if (output_vector[j] != expected[i][j]) {
+                                cerr << "Verification failed at (" << i << "," << j << "): expected=" << expected[i][j] << ", actual=" << output_vector[j] << endl;
+                                return 1;
+                            }
+                        }
+                    }
+                }
+            }
+            cout << "\033[32mTotal time: " << total_time * 1000 / nums_run << " ms\033[0m" << endl;
+        }
+    } catch (const exception& e) {
+        cerr << "错误: " << e.what() << endl;
+        return 1;
+    }
+    return 0;
+}
+
 int test_ciphertext_scale_multiplication(bool verbose) {
     try {
         json config = read_seal_config();
@@ -1062,8 +1152,24 @@ int main() {
             cout << "程序退出。" << endl;
             break;
         }
+        else if (choice == "10") {
+            cout << "\ntest_encrypted_matrix_times_clear_matrix..." << endl;
+            cout << "==========================================" << endl;
+            int num_bits = 64;
+            cout << "Input num_bits: ";
+            cin >> num_bits;
+            bool check_correctness;
+            cout << "Input check_correctness: ";
+            cin >> check_correctness;
+            cin.ignore();
+            int result = test_encrypted_matrix_times_clear_matrix(num_bits, check_correctness);
+            if (result == 0)
+                cout << "\n密文矩阵与明文矩阵乘法测试成功完成！（bit宽度=" << num_bits << ")" << endl;
+            else
+                cout << "\n密文矩阵与明文矩阵乘法测试失败！（bit宽度=" << num_bits << ")" << endl;
+        }
         else {
-            cout << "无效选择，请输入 1、2、3、4、5、6、7、8、9。" << endl;
+            cout << "无效选择，请输入 1、2、3、4、5、6、7、8、9、10。" << endl;
         }
         
         cout << "\n按回车键继续...";

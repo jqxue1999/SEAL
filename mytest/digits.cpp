@@ -351,3 +351,24 @@ double clear_vector_times_encrypted_matrix(
     auto duration = chrono::duration<double>(end_time - start_time);
     return duration.count();
 }
+
+double encrypted_matrix_times_clear_matrix(
+    const SEALContext& context,
+    Encryptor& encryptor,
+    Evaluator& evaluator,
+    const vector<vector<Ciphertext>>& encrypted_matrix,
+    const vector<vector<uint64_t>>& clear_matrix,
+    vector<vector<Ciphertext>>& result,
+    int num_bits,
+    bool verbose)
+{
+    auto start_time = chrono::high_resolution_clock::now();
+    size_t n = encrypted_matrix.size();
+    result.resize(n);
+    for (size_t i = 0; i < n; ++i) {
+        clear_vector_times_encrypted_matrix(context, encryptor, evaluator, clear_matrix[i], encrypted_matrix, result[i], num_bits, verbose);
+    }
+    auto end_time = chrono::high_resolution_clock::now();
+    auto duration = chrono::duration<double>(end_time - start_time);
+    return duration.count();
+}

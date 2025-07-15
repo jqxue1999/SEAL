@@ -36,6 +36,8 @@ int test_ciphertext_scale_multiplication(bool verbose = false);
 
 int test_vector_vector_outer_multiplication(bool verbose = false);
 
+int test_encrypted_matrix_times_clear_matrix(int num_bits = 64, bool check_correctness = false);
+
 void print_menu();
 
 #endif // EXAMPLE_H 
