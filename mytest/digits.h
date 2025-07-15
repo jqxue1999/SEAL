@@ -39,12 +39,14 @@ void decompose_to_bit_vectors(
  * 将位级向量重新组合为整数向量
  * 
  * @param bit_vectors 位级向量数组 [64个向量]
+ * @param plain_modulus_value 明文模数
  * @param output_vector 输出的整数向量
  */
 void compose_from_bit_vectors(
     const vector<vector<uint64_t>>& bit_vectors,
     vector<uint64_t>& output_vector,
-    int num_bits = 64);
+    int num_bits = 64,
+    uint64_t plain_modulus_value = 0);
 
 /**
  * 加密位级向量
@@ -159,7 +161,6 @@ bool verify_general_multiplication(
  * @param decryptor 解密器
  * @param num_bits 位数
  * @param clear_vector 明文向量
- * @param plain_vector 明文向量
  * @param bit_vectors_ciphertext 密文bit向量
  * @param outer_product_results 外积结果
  * @param verbose 是否打印详细信息
@@ -172,9 +173,19 @@ vector<double> clear_vector_outer_product_with_encrypted_bits(
     Decryptor& decryptor,
     int num_bits,
     const vector<uint64_t>& clear_vector,
-    const vector<uint64_t>& plain_vector,
     const vector<Ciphertext>& bit_vectors_ciphertext,
     vector<vector<Ciphertext>>& outer_product_results,
+    bool verbose = false);
+
+// 计算明文向量和密文矩阵的乘积，结果为密文bit向量
+double clear_vector_times_encrypted_matrix(
+    const SEALContext& context,
+    Encryptor& encryptor,
+    Evaluator& evaluator,
+    const vector<uint64_t>& clear_vector,
+    const vector<vector<Ciphertext>>& encrypted_matrix,
+    vector<Ciphertext>& result,
+    int num_bits,
     bool verbose = false);
 
 #endif // DIGITS_H 

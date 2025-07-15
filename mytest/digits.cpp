@@ -28,7 +28,8 @@ void decompose_to_bit_vectors(
 void compose_from_bit_vectors(
     const vector<vector<uint64_t>>& bit_vectors,
     vector<uint64_t>& output_vector,
-    int num_bits)
+    int num_bits,
+    uint64_t plain_modulus_value)
 {
     if (bit_vectors.empty() || bit_vectors[0].empty()) {
         cerr << "位级向量为空" << endl;
@@ -57,7 +58,7 @@ void compose_from_bit_vectors(
             result += bit_value * (1ULL << bit);
         }
         
-        output_vector[i] = result;
+        output_vector[i] = result % plain_modulus_value;
     }
 }
 
@@ -295,7 +296,6 @@ vector<double> clear_vector_outer_product_with_encrypted_bits(
     Decryptor& decryptor,
     int num_bits,
     const vector<uint64_t>& clear_vector,
-    const vector<uint64_t>& plain_vector,
     const vector<Ciphertext>& bit_vectors_ciphertext,
     vector<vector<Ciphertext>>& outer_product_results,
     bool verbose)
@@ -316,4 +316,38 @@ vector<double> clear_vector_outer_product_with_encrypted_bits(
     }
 
     return {zero_ciphertext_time, decompose_time, multiply_time};
+}
+
+double clear_vector_times_encrypted_matrix(
+    const SEALContext& context,
+    Encryptor& encryptor,
+    Evaluator& evaluator,
+    const vector<uint64_t>& clear_vector,
+    const vector<vector<Ciphertext>>& encrypted_matrix,
+    vector<Ciphertext>& result,
+    int num_bits,
+    bool verbose)
+{
+    auto start_time = chrono::high_resolution_clock::now();
+    size_t n = clear_vector.size();
+    size_t m = encrypted_matrix[0].size();
+
+    Ciphertext zero_ciphertext;
+    initialize_zero_ciphertext(context, encryptor, zero_ciphertext);
+    result.resize(m);
+    for (size_t j = 0; j < m; ++j) {
+        result[j] = zero_ciphertext;
+    }
+    for (size_t i = 0; i < n; ++i) {
+        uint64_t scalar = clear_vector[i];
+        const vector<Ciphertext>& row = encrypted_matrix[i];
+        vector<Ciphertext> partial;
+        multiply_by_general_scalar(context, encryptor, evaluator, zero_ciphertext, row, scalar, partial, num_bits, verbose);
+        for (size_t j = 0; j < m; ++j) {
+            evaluator.add_inplace(result[j], partial[j]);
+        }
+    }
+    auto end_time = chrono::high_resolution_clock::now();
+    auto duration = chrono::duration<double>(end_time - start_time);
+    return duration.count();
 }
