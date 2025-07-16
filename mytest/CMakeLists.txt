@@ -79,4 +79,11 @@ if(SEAL_BUILD_EXAMPLES)
     # Link nlohmann/json library
     target_link_libraries(example PRIVATE nlohmann_json::nlohmann_json)
     target_link_libraries(example PRIVATE OpenMP::OpenMP_CXX)
+
+    # Benchmark for plaintext.cpp
+    add_executable(plaintext_bench ${CMAKE_CURRENT_LIST_DIR}/plaintext.cpp)
+    target_link_libraries(plaintext_bench PRIVATE ${BLAS_LIBRARIES} OpenMP::OpenMP_CXX)
+    if (BLAS_INCLUDE_DIRS)
+        target_include_directories(plaintext_bench PRIVATE ${BLAS_INCLUDE_DIRS})
+    endif()
 endif()
