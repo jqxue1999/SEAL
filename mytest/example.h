@@ -34,6 +34,8 @@ int test_digits_pvcm(int num_bits = 64, bool check_correctness = false);
 
 int test_digits_pmcm(int num_bits = 64, bool check_correctness = false);
 
+int test_standard_cvps(bool verbose = false);
+
 int test_ciphertext_scale_multiplication(bool verbose = false);
 
 int test_vector_vector_outer_multiplication(bool verbose = false);

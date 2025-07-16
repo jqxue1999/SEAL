@@ -98,8 +98,9 @@ void print_menu() {
     cout << "7. Digits CVPV" << endl;
     cout << "8. Digits PVCM" << endl;
     cout << "9. Digits PMCM" << endl;    
-    cout << "10. 退出程序" << endl;
-    cout << "请输入选择 (1-10): ";
+    cout << "10. Standard CVPS" << endl;
+    cout << "11. 退出程序" << endl;
+    cout << "请输入选择 (1-11): ";
 }
 
 void test_cpmm(bool verbose) {
@@ -1054,6 +1055,115 @@ int test_vector_vector_outer_multiplication(bool verbose) {
     return 0;
 }
 
+int test_standard_cvps(bool verbose) {
+    try {
+        json config = read_seal_config("seal_config.json", verbose);
+        if (config.empty()) {
+            cerr << "Error: cannot read config file" << endl;
+            return 1;
+        }
+        
+        vector<size_t> poly_modulus_degree_options = {4096, 8192, 16384};
+        for (size_t poly_modulus_degree : poly_modulus_degree_options) {
+            cout << "degree: " << poly_modulus_degree << endl;
+            vector<int> coeff_modulus_params = get_coeff_modulus_params(config, poly_modulus_degree);
+            if (coeff_modulus_params.empty()) {
+                cerr << "Error: cannot get coeff modulus params" << endl;
+                return 1;
+            }
+            
+            scheme_type scheme = scheme_type::bfv;
+            EncryptionParameters parms(scheme);
+            parms.set_poly_modulus_degree(poly_modulus_degree);
+            parms.set_coeff_modulus(CoeffModulus::Create(poly_modulus_degree, coeff_modulus_params));
+            parms.set_plain_modulus(PlainModulus::Batching(poly_modulus_degree, 20));
+
+            SEALContext context(parms);
+            if (verbose)
+                print_parameters(context);
+            
+            // Generate keys
+            KeyGenerator keygen(context);
+            SecretKey secret_key = keygen.secret_key();
+            PublicKey public_key;
+            keygen.create_public_key(public_key);
+            
+            Encryptor encryptor(context, public_key);
+            Decryptor decryptor(context, secret_key);
+            Evaluator evaluator(context);
+
+            // Create encoder for CRT packing
+            BatchEncoder encoder(context);
+            size_t slot_count = encoder.slot_count();
+            
+            vector<double> time_vec{0, 0, 0};
+            
+            int num_runs = 100;
+            for (size_t run = 0; run < num_runs; run++) {
+                // Create random input vector
+                vector<uint64_t> input_vector(slot_count);
+                for (size_t i = 0; i < slot_count; i++) {
+                    input_vector[i] = rand() % 1000;
+                }
+                
+                // Create random scalar
+                uint64_t scalar = rand() % 1000;
+                
+                // Encode and encrypt the vector using CRT packing
+                Plaintext plaintext;
+                encoder.encode(input_vector, plaintext);
+                Ciphertext encrypted_vector;
+                encryptor.encrypt(plaintext, encrypted_vector);
+                
+                // Encode scalar as plaintext
+                Plaintext scalar_plaintext;
+                encoder.encode(scalar, scalar_plaintext);
+                
+                // Perform scalar multiplication using standard SEAL
+                auto start_time = chrono::high_resolution_clock::now();
+                
+                Ciphertext result;
+                evaluator.multiply_plain(encrypted_vector, scalar_plaintext, result);
+                
+                auto end_time = chrono::high_resolution_clock::now();
+                auto duration = chrono::duration<double>(end_time - start_time);
+                time_vec[0] += duration.count();
+                
+                // Decrypt and verify result
+                Plaintext decrypted_result;
+                decryptor.decrypt(result, decrypted_result);
+                vector<uint64_t> output_vector;
+                encoder.decode(decrypted_result, output_vector);
+                
+                // Verify correctness
+                bool all_correct = true;
+                size_t check_size = min(size_t(100), slot_count); // Check first 100 elements
+                
+                for (size_t i = 0; i < check_size && all_correct; i++) {
+                    uint64_t expected = (input_vector[i] * scalar) % parms.plain_modulus().value();
+                    if (output_vector[i] != expected) {
+                        cout << "Error: position[" << i << "] "
+                             << "expected=" << expected 
+                             << ", actual=" << output_vector[i] << endl;
+                        all_correct = false;
+                    }
+                }
+                
+                if (!all_correct) {
+                    throw runtime_error("Standard SEAL scalar-vector multiplication verification failed!");
+                }
+            }
+            
+            cout << "\033[32mAverage time[" << poly_modulus_degree << "]: " << time_vec[0] * 1000 / num_runs << " ms\033[0m" << endl;
+        }
+    } catch (const exception& e) {
+        cerr << "Error: " << e.what() << endl;
+        return 1;
+    }
+    
+    return 0;
+}
+
 int main() {
     string choice;
     
@@ -1160,12 +1270,22 @@ int main() {
                 cout << "\n密文矩阵与明文矩阵乘法测试失败！（bit宽度=" << num_bits << ")" << endl;
         }
         else if (choice == "10") {
+            cout << "\n开始测试标准SEAL标量-向量乘法..." << endl;
+            cout << "==========================================" << endl;
+            int result = test_standard_seal_scalar_vector_multiplication(false);
+            if (result == 0) {
+                cout << "\n标准SEAL标量-向量乘法测试成功完成！" << endl;
+            } else {
+                cout << "\n标准SEAL标量-向量乘法测试失败！" << endl;
+            }
+        }
+        else if (choice == "11") {
             cout << "程序退出。" << endl;
             break;
         }
         
         else {
-            cout << "无效选择，请输入 1、2、3、4、5、6、7、8、9、10。" << endl;
+            cout << "无效选择，请输入 1、2、3、4、5、6、7、8、9、10、11。" << endl;
         }
         
         cout << "\n按回车键继续...";
