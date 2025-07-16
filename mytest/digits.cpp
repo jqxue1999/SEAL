@@ -228,10 +228,12 @@ vector<double> multiply_by_general_scalar(
     start = chrono::high_resolution_clock::now();
     result_vectors.resize(num_bits);
     if (powers.empty()) {
+        #pragma omp parallel for
         for (int bit = 0; bit < num_bits; bit++)
             result_vectors[bit] = zero_ciphertext;
     } else {
         int p_min = *min_element(powers.begin(), powers.end());
+        #pragma omp parallel for
         for (int target_bit = 0; target_bit < num_bits; target_bit++) {
             int source_bit = target_bit - p_min;
             if (source_bit >= 0 && source_bit < num_bits) {
@@ -241,6 +243,7 @@ vector<double> multiply_by_general_scalar(
             }
         }
         int number_of_add_inplace = 0;
+        #pragma omp parallel for reduction(+:number_of_add_inplace)
         for (int target_bit = 0; target_bit < num_bits; target_bit++) {
             for (int power : powers) {
                 if (power == p_min) continue;
@@ -303,16 +306,18 @@ vector<double> clear_vector_outer_product_with_encrypted_bits(
     size_t poly_modulus_degree = clear_vector.size();
     double zero_ciphertext_time = 0, decompose_time = 0, multiply_time = 0;
 
+    outer_product_results.resize(clear_vector.size());
     Ciphertext zero_ciphertext;
     zero_ciphertext_time += initialize_zero_ciphertext(context, encryptor, zero_ciphertext);
 
+    #pragma omp parallel for
     for (size_t i = 0; i < clear_vector.size(); ++i) {
         uint64_t scalar = clear_vector[i];
         vector<Ciphertext> result_vectors;
         vector<double> time_vec = multiply_by_general_scalar(context, encryptor, evaluator, zero_ciphertext, bit_vectors_ciphertext, scalar, result_vectors, num_bits);
         decompose_time += time_vec[0];
         multiply_time += time_vec[1];
-        outer_product_results.push_back(result_vectors);
+        outer_product_results[i] = result_vectors;
     }
 
     return {zero_ciphertext_time, decompose_time, multiply_time};
@@ -338,6 +343,7 @@ double clear_vector_times_encrypted_matrix(
     for (size_t j = 0; j < m; ++j) {
         result[j] = zero_ciphertext;
     }
+    #pragma omp parallel for
     for (size_t i = 0; i < n; ++i) {
         uint64_t scalar = clear_vector[i];
         const vector<Ciphertext>& row = encrypted_matrix[i];
@@ -365,6 +371,8 @@ double encrypted_matrix_times_clear_matrix(
     auto start_time = chrono::high_resolution_clock::now();
     size_t n = encrypted_matrix.size();
     result.resize(n);
+
+    #pragma omp parallel for
     for (size_t i = 0; i < n; ++i) {
         clear_vector_times_encrypted_matrix(context, encryptor, evaluator, clear_matrix[i], encrypted_matrix, result[i], num_bits, verbose);
     }
