@@ -8,40 +8,6 @@
 using namespace seal;
 using namespace std;
 
-json read_seal_config(const string& config_file, bool verbose) {
-    json config;
-    
-    // 打印当前工作目录
-    char cwd[1024];
-    if (getcwd(cwd, sizeof(cwd)) != NULL) {
-        if (verbose)
-            cout << "Current working directory: " << cwd << endl;
-    } else {
-            cout << "Cannot get current working directory" << endl;
-    }
-    
-    // 直接使用固定路径
-    string config_path = "../../" + config_file;
-    if (verbose)
-        cout << "Try to read config file: " << config_path << endl;
-    
-    try {
-        ifstream file(config_path);
-        if (file.is_open()) {
-            file >> config;
-            file.close();
-            if (verbose)
-                cout << "Successfully read config file: " << config_path << endl;
-            return config;
-        } else {
-            cerr << "Error: cannot open config file " << config_path << endl;
-        }
-    } catch (const exception& e) {
-        cerr << "Error: cannot parse config file: " << e.what() << endl;
-    }
-    
-    return config;
-}
 
 size_t get_user_poly_modulus_degree(const json& config) {
     vector<size_t> options = config["poly_modulus_degree_options"].get<vector<size_t>>();
@@ -76,15 +42,7 @@ size_t get_user_poly_modulus_degree(const json& config) {
     }
 }
 
-vector<int> get_coeff_modulus_params(const json& config, size_t poly_modulus_degree) {
-    string degree_str = to_string(poly_modulus_degree);
-    if (config["coeff_modulus_configs"].contains(degree_str)) {
-        return config["coeff_modulus_configs"][degree_str]["coeff_modulus"].get<vector<int>>();
-    } else {
-        cerr << "错误: 配置文件中未找到多项式模数次数 " << poly_modulus_degree << " 的参数" << endl;
-        return vector<int>();
-    }
-}
+
 
 void print_menu() {
     cout << "\n=== SEAL 矩阵乘法测试程序 ===" << endl;

@@ -14,11 +14,7 @@
 using namespace std;
 using json = nlohmann::json;
 
-json read_seal_config(const string& config_file = "seal_config.json", bool verbose = false);
-
 size_t get_user_poly_modulus_degree(const json& config);
-
-vector<int> get_coeff_modulus_params(const json& config, size_t poly_modulus_degree);
 
 void test_cpmm(bool verbose = false);
 

@@ -32,6 +32,9 @@ if(NOT DEFINED SEAL_BUILD_EXAMPLES)
 endif()
 
 if(SEAL_BUILD_EXAMPLES)
+    list(APPEND CMAKE_PREFIX_PATH "/home/jiaq/Research/SEAL/benchmarklibs")
+    find_package(benchmark REQUIRED)
+
     add_executable(test_example)
 
     target_sources(test_example
@@ -80,10 +83,50 @@ if(SEAL_BUILD_EXAMPLES)
     target_link_libraries(example PRIVATE nlohmann_json::nlohmann_json)
     target_link_libraries(example PRIVATE OpenMP::OpenMP_CXX)
 
-    # Benchmark for plaintext.cpp
-    add_executable(plaintext_bench ${CMAKE_CURRENT_LIST_DIR}/plaintext.cpp)
-    target_link_libraries(plaintext_bench PRIVATE ${BLAS_LIBRARIES} OpenMP::OpenMP_CXX)
+    # Benchmark for plain_blas.cpp
+    add_executable(plain_blas_bench ${CMAKE_CURRENT_LIST_DIR}/plain_blas.cpp)
+    target_link_libraries(plain_blas_bench PRIVATE ${BLAS_LIBRARIES} OpenMP::OpenMP_CXX)
     if (BLAS_INCLUDE_DIRS)
-        target_include_directories(plaintext_bench PRIVATE ${BLAS_INCLUDE_DIRS})
+        target_include_directories(plain_blas_bench PRIVATE ${BLAS_INCLUDE_DIRS})
     endif()
+    target_link_libraries(plain_blas_bench PRIVATE benchmark::benchmark pthread)
+
+    # Benchmark for plain_omp.cpp
+    add_executable(plain_omp_bench ${CMAKE_CURRENT_LIST_DIR}/plain_omp.cpp)
+    target_link_libraries(plain_omp_bench PRIVATE ${BLAS_LIBRARIES} OpenMP::OpenMP_CXX)
+    if (BLAS_INCLUDE_DIRS)
+        target_include_directories(plain_omp_bench PRIVATE ${BLAS_INCLUDE_DIRS})
+    endif()
+    target_link_libraries(plain_omp_bench PRIVATE benchmark::benchmark pthread)
+
+    # coefficients_seal test program
+    add_executable(coefficients_seal_bench)
+
+    target_sources(coefficients_seal_bench
+        PRIVATE
+            ${CMAKE_CURRENT_LIST_DIR}/coefficients_seal.cpp
+            ${CMAKE_CURRENT_LIST_DIR}/cpmm.cpp
+            ${CMAKE_CURRENT_LIST_DIR}/utils.cpp
+    )
+
+    if(TARGET SEAL::seal)
+        target_link_libraries(coefficients_seal_bench PRIVATE SEAL::seal)
+    elseif(TARGET SEAL::seal_shared)
+        target_link_libraries(coefficients_seal_bench PRIVATE SEAL::seal_shared)
+    else()
+        message(FATAL_ERROR "Cannot find target SEAL::seal or SEAL::seal_shared")
+    endif()
+
+    if(BLAS_FOUND)
+        target_link_libraries(coefficients_seal_bench PRIVATE ${BLAS_LIBRARIES})
+        if (BLAS_INCLUDE_DIRS)
+            target_include_directories(coefficients_seal_bench PRIVATE ${BLAS_INCLUDE_DIRS})
+        endif()
+    endif()
+    
+    # Link nlohmann/json library
+    target_link_libraries(coefficients_seal_bench PRIVATE nlohmann_json::nlohmann_json)
+    target_link_libraries(coefficients_seal_bench PRIVATE OpenMP::OpenMP_CXX)
+    target_link_libraries(coefficients_seal_bench PRIVATE benchmark::benchmark pthread)
+
 endif()

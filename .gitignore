@@ -24,6 +24,8 @@ CMakeSettings.json
 # Local libraries
 seallibs/
 seallibs_old/
+benchmarklibs/
+benchmark/
 
 # WebAssembly Output
 seal_wasm.js
