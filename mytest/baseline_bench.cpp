@@ -1,68 +1,16 @@
-#include "coefficients_seal.h"
+#include <benchmark/benchmark.h>
+#include "baseline.h"
+#include "utils.h"
+#include <iostream>
+#include <nlohmann/json.hpp>
 
-void cvps(
-    const SEALContext& context,
-    const uint64_t scalar,
-    const Ciphertext& encrypted_vector_coeff,
-    Ciphertext& encrypted_vector_coeff_result
-) {    
-    encrypted_vector_coeff_result = encrypted_vector_coeff;
-    EncryptionParameters parms = context.first_context_data()->parms();
-    
-    MemoryPoolHandle pool = MemoryManager::GetPool();
-    util::negacyclic_multiply_poly_mono_coeffmod(
-        encrypted_vector_coeff, encrypted_vector_coeff.size(), scalar, 0, parms.coeff_modulus(), encrypted_vector_coeff_result, pool
-    );
-}
-
-void cvpv(
-    const SEALContext& context,
-    const vector<uint64_t>& clear_vector,
-    const Ciphertext& encrypted_vector_coeff, 
-    vector<Ciphertext>& encrypted_vector_coeff_result
-) {
-    encrypted_vector_coeff_result.resize(clear_vector.size());
-    #pragma omp parallel for
-    for (size_t i = 0; i < clear_vector.size(); ++i) {
-        cvps(context, clear_vector[i], encrypted_vector_coeff, encrypted_vector_coeff_result[i]);
-    }
-}
-
-void pvcm(
-    const SEALContext& context,
-    const Evaluator& evaluator,
-    const vector<uint64_t>& clear_vector,
-    const vector<Ciphertext>& encrypted_matrix_coeff,
-    Ciphertext& encrypted_matrix_coeff_result
-) {
-    cvps(context, clear_vector[0], encrypted_matrix_coeff[0], encrypted_matrix_coeff_result);
-
-    #pragma omp parallel for
-    for (size_t i = 1; i < clear_vector.size(); i++) {
-        Ciphertext partial;
-        cvps(context, clear_vector[i], encrypted_matrix_coeff[i], partial);
-        evaluator.add_inplace(encrypted_matrix_coeff_result, partial);
-    }
-}
-
-void pmcm(
-    const SEALContext& context,
-    const Evaluator& evaluator,
-    const vector<vector<uint64_t>>& clear_matrix,
-    const vector<Ciphertext>& encrypted_matrix_coeff,
-    vector<Ciphertext>& encrypted_matrix_coeff_result
-) {
-    encrypted_matrix_coeff_result.resize(clear_matrix.size());
-    #pragma omp parallel for
-    for (size_t i = 0; i < clear_matrix.size(); i++)
-        pvcm(context, evaluator, clear_matrix[i], encrypted_matrix_coeff, encrypted_matrix_coeff_result[i]);
-}
-
-// Google Benchmark for cvps
-static void BM_cvps(benchmark::State& state) {
+using json = nlohmann::json;
+// Google Benchmark for cvps baseline
+static void BM_cvps_baseline(benchmark::State& state) {
     size_t poly_modulus_degree = static_cast<size_t>(state.range(0));
     json config = read_seal_config("/home/jiaq/Research/SEAL/mytest/seal_config.json");
     vector<int> coeff_modulus_params = get_coeff_modulus_params(config, poly_modulus_degree);
+    
     scheme_type scheme = scheme_type::bfv;
     EncryptionParameters parms(scheme);
     parms.set_poly_modulus_degree(poly_modulus_degree);
@@ -74,6 +22,8 @@ static void BM_cvps(benchmark::State& state) {
     PublicKey public_key;
     keygen.create_public_key(public_key);
     Encryptor encryptor(context, public_key);
+    Evaluator evaluator(context);
+    BatchEncoder batch_encoder(context);
 
     vector<uint64_t> input_vector(poly_modulus_degree);
     for (size_t i = 0; i < poly_modulus_degree; i++) {
@@ -81,21 +31,22 @@ static void BM_cvps(benchmark::State& state) {
     }
     uint64_t scalar = rand();
     Plaintext plaintext;
-    encode_vector_to_plaintext(input_vector, context, plaintext);
+    batch_encoder.encode(input_vector, plaintext);
     Ciphertext encrypted_vector_coeff;
     encryptor.encrypt(plaintext, encrypted_vector_coeff);
     Ciphertext encrypted_vector_coeff_result;
 
     for (auto _ : state) {
-        cvps(context, scalar, encrypted_vector_coeff, encrypted_vector_coeff_result);
+        cvps_baseline(context, batch_encoder, evaluator, scalar, encrypted_vector_coeff, encrypted_vector_coeff_result);
     }
 }
 
-// Google Benchmark for cvpv
-static void BM_cvpv(benchmark::State& state) {
+// Google Benchmark for cvpv baseline
+static void BM_cvpv_baseline(benchmark::State& state) {
     size_t poly_modulus_degree = static_cast<size_t>(state.range(0));
     json config = read_seal_config("/home/jiaq/Research/SEAL/mytest/seal_config.json");
     vector<int> coeff_modulus_params = get_coeff_modulus_params(config, poly_modulus_degree);
+    
     scheme_type scheme = scheme_type::bfv;
     EncryptionParameters parms(scheme);
     parms.set_poly_modulus_degree(poly_modulus_degree);
@@ -107,7 +58,9 @@ static void BM_cvpv(benchmark::State& state) {
     PublicKey public_key;
     keygen.create_public_key(public_key);
     Encryptor encryptor(context, public_key);
-
+    Evaluator evaluator(context);
+    BatchEncoder batch_encoder(context);
+    
     vector<uint64_t> input_vector(poly_modulus_degree);
     vector<uint64_t> clear_vector(poly_modulus_degree);
     for (size_t i = 0; i < poly_modulus_degree; i++) {
@@ -115,21 +68,22 @@ static void BM_cvpv(benchmark::State& state) {
         clear_vector[i] = rand();
     }
     Plaintext plaintext;
-    encode_vector_to_plaintext(input_vector, context, plaintext);
+    batch_encoder.encode(input_vector, plaintext);
     Ciphertext encrypted_vector_coeff;
     encryptor.encrypt(plaintext, encrypted_vector_coeff);
     vector<Ciphertext> encrypted_vector_coeff_result;
 
     for (auto _ : state) {
-        cvpv(context, clear_vector, encrypted_vector_coeff, encrypted_vector_coeff_result);
+        cvpv_baseline(context, batch_encoder, evaluator, clear_vector, encrypted_vector_coeff, encrypted_vector_coeff_result);
     }
 }
 
-// Google Benchmark for pvcm
-static void BM_pvcm(benchmark::State& state) {
+// Google Benchmark for pvcm baseline
+static void BM_pvcm_baseline(benchmark::State& state) {
     size_t poly_modulus_degree = static_cast<size_t>(state.range(0));
     json config = read_seal_config("/home/jiaq/Research/SEAL/mytest/seal_config.json");
     vector<int> coeff_modulus_params = get_coeff_modulus_params(config, poly_modulus_degree);
+    
     scheme_type scheme = scheme_type::bfv;
     EncryptionParameters parms(scheme);
     parms.set_poly_modulus_degree(poly_modulus_degree);
@@ -142,6 +96,7 @@ static void BM_pvcm(benchmark::State& state) {
     keygen.create_public_key(public_key);
     Encryptor encryptor(context, public_key);
     Evaluator evaluator(context);
+    BatchEncoder batch_encoder(context);
 
     vector<uint64_t> clear_vector(poly_modulus_degree);
     vector<vector<uint64_t>> input_matrix(poly_modulus_degree, vector<uint64_t>(poly_modulus_degree));
@@ -154,21 +109,22 @@ static void BM_pvcm(benchmark::State& state) {
     Plaintext plaintext;
     vector<Ciphertext> encrypted_matrix_coeff(poly_modulus_degree);
     for (size_t i = 0; i < poly_modulus_degree; i++) {
-        encode_vector_to_plaintext(input_matrix[i], context, plaintext);
+        batch_encoder.encode(input_matrix[i], plaintext);
         encryptor.encrypt(plaintext, encrypted_matrix_coeff[i]);
     }
     Ciphertext encrypted_matrix_coeff_result;
 
     for (auto _ : state) {
-        pvcm(context, evaluator, clear_vector, encrypted_matrix_coeff, encrypted_matrix_coeff_result);
+        pvcm_baseline(context, batch_encoder, evaluator, clear_vector, encrypted_matrix_coeff, encrypted_matrix_coeff_result);
     }
 }
 
-// Google Benchmark for pmcm
-static void BM_pmcm(benchmark::State& state) {
+// Google Benchmark for pmcm baseline
+static void BM_pmcm_baseline(benchmark::State& state) {
     size_t poly_modulus_degree = static_cast<size_t>(state.range(0));
     json config = read_seal_config("/home/jiaq/Research/SEAL/mytest/seal_config.json");
     vector<int> coeff_modulus_params = get_coeff_modulus_params(config, poly_modulus_degree);
+
     scheme_type scheme = scheme_type::bfv;
     EncryptionParameters parms(scheme);
     parms.set_poly_modulus_degree(poly_modulus_degree);
@@ -181,54 +137,57 @@ static void BM_pmcm(benchmark::State& state) {
     keygen.create_public_key(public_key);
     Encryptor encryptor(context, public_key);
     Evaluator evaluator(context);
+    BatchEncoder batch_encoder(context);
 
+    uint64_t plain_modulus_value = parms.plain_modulus().value();
+    cout << "plain_modulus_value: " << plain_modulus_value << endl;
     vector<vector<uint64_t>> clear_matrix(poly_modulus_degree, vector<uint64_t>(poly_modulus_degree));
     vector<vector<uint64_t>> input_matrix(poly_modulus_degree, vector<uint64_t>(poly_modulus_degree));
     for (size_t i = 0; i < poly_modulus_degree; i++) {
         for (size_t j = 0; j < poly_modulus_degree; j++) {
-            clear_matrix[i][j] = rand();
-            input_matrix[i][j] = rand();
+            clear_matrix[i][j] = abs(rand()) + 1;
+            input_matrix[i][j] = abs(rand()) + 1;
         }
     }
     Plaintext plaintext;
     vector<Ciphertext> encrypted_matrix_coeff(poly_modulus_degree);
     for (size_t i = 0; i < poly_modulus_degree; i++) {
-        encode_vector_to_plaintext(input_matrix[i], context, plaintext);
+        batch_encoder.encode(input_matrix[i], plaintext);
         encryptor.encrypt(plaintext, encrypted_matrix_coeff[i]);
     }
     vector<Ciphertext> encrypted_matrix_coeff_result;
 
     for (auto _ : state) {
-        pmcm(context, evaluator, clear_matrix, encrypted_matrix_coeff, encrypted_matrix_coeff_result);
+        pmcm_baseline(context, batch_encoder, evaluator, clear_matrix, encrypted_matrix_coeff, encrypted_matrix_coeff_result);
     }
 }
 
-// Google Benchmark for cvps
-BENCHMARK(BM_cvps)
+// Google Benchmark for cvps baseline
+BENCHMARK(BM_cvps_baseline)
     ->Arg(1024)
     ->Arg(2048)
     ->Arg(4096)
     ->Arg(8192)
     ->Unit(benchmark::kMillisecond);
 
-// Google Benchmark for cvpv
-BENCHMARK(BM_cvpv)
+// Google Benchmark for cvpv baseline
+BENCHMARK(BM_cvpv_baseline)
     ->Arg(1024)
     ->Arg(2048)
     ->Arg(4096)
     ->Arg(8192)
     ->Unit(benchmark::kMillisecond);
 
-// Google Benchmark for pvcm
-BENCHMARK(BM_pvcm)
+// Google Benchmark for pvcm baseline
+BENCHMARK(BM_pvcm_baseline)
     ->Arg(1024)
     ->Arg(2048)
     ->Arg(4096)
     ->Arg(8192)
     ->Unit(benchmark::kMillisecond);
 
-// Google Benchmark for pmcm
-BENCHMARK(BM_pmcm)
+// Google Benchmark for pmcm baseline
+BENCHMARK(BM_pmcm_baseline)
     ->Arg(1024)
     ->Arg(2048)
     ->Arg(4096)

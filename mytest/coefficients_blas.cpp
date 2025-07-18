@@ -200,37 +200,33 @@ static void BM_pmcm(benchmark::State& state) {
 // Google Benchmark for cvps
 BENCHMARK(BM_cvps)
     ->Arg(1024)
-    // ->Arg(2048)
-    // ->Arg(4096)
-    // ->Arg(8192)
-    // ->Arg(16384)
+    ->Arg(2048)
+    ->Arg(4096)
+    ->Arg(8192)
     ->Unit(benchmark::kMillisecond);
 
 // Google Benchmark for cvpv
 BENCHMARK(BM_cvpv)
     ->Arg(1024)
-    // ->Arg(2048)
-    // ->Arg(4096)
-    // ->Arg(8192)
-    // ->Arg(16384)
+    ->Arg(2048)
+    ->Arg(4096)
+    ->Arg(8192)
     ->Unit(benchmark::kMillisecond);
 
 // Google Benchmark for pvcm
 BENCHMARK(BM_pvcm)
     ->Arg(1024)
-    // ->Arg(2048)
-    // ->Arg(4096)
-    // ->Arg(8192)
-    // ->Arg(16384)
+    ->Arg(2048)
+    ->Arg(4096)
+    ->Arg(8192)
     ->Unit(benchmark::kMillisecond);
 
 // Google Benchmark for pmcm
 BENCHMARK(BM_pmcm)
     ->Arg(1024)
-    // ->Arg(2048)
-    // ->Arg(4096)
-    // ->Arg(8192)
-    // ->Arg(16384)
+    ->Arg(2048)
+    ->Arg(4096)
+    ->Arg(8192)
     ->Unit(benchmark::kMillisecond);
 
 BENCHMARK_MAIN();

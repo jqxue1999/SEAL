@@ -189,6 +189,35 @@ if(SEAL_BUILD_EXAMPLES)
     target_link_libraries(digits_bench PRIVATE OpenMP::OpenMP_CXX)
     target_link_libraries(digits_bench PRIVATE benchmark::benchmark pthread)
 
+    # Benchmark for baseline_bench.cpp
+    add_executable(baseline_bench)
+    target_sources(baseline_bench
+        PRIVATE
+            ${CMAKE_CURRENT_LIST_DIR}/baseline_bench.cpp
+            ${CMAKE_CURRENT_LIST_DIR}/baseline.cpp
+            ${CMAKE_CURRENT_LIST_DIR}/utils.cpp
+    )
+
+    if(TARGET SEAL::seal)
+        target_link_libraries(baseline_bench PRIVATE SEAL::seal)
+    elseif(TARGET SEAL::seal_shared)
+        target_link_libraries(baseline_bench PRIVATE SEAL::seal_shared)
+    else()
+        message(FATAL_ERROR "Cannot find target SEAL::seal or SEAL::seal_shared")
+    endif()
+
+    if(BLAS_FOUND)
+        target_link_libraries(baseline_bench PRIVATE ${BLAS_LIBRARIES})
+        if (BLAS_INCLUDE_DIRS)
+            target_include_directories(baseline_bench PRIVATE ${BLAS_INCLUDE_DIRS})
+        endif()
+    endif()
+    
+    # Link nlohmann/json library
+    target_link_libraries(baseline_bench PRIVATE nlohmann_json::nlohmann_json)
+    target_link_libraries(baseline_bench PRIVATE OpenMP::OpenMP_CXX)
+    target_link_libraries(baseline_bench PRIVATE benchmark::benchmark pthread)
+
 
 
 endif()

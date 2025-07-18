@@ -183,36 +183,32 @@ static void BM_digits_pmcm(benchmark::State& state) {
     }
 }
 
-// BENCHMARK(BM_digits_cvps)
-//     ->Args({1024, 8})
-//     ->Args({2048, 8})
-//     ->Args({4096, 8})
-//     ->Args({8192, 8})
-//     ->Args({16384, 8})
-//     ->Unit(benchmark::kMillisecond);
+BENCHMARK(BM_digits_cvps)
+    ->Args({1024, 8})
+    ->Args({2048, 8})
+    ->Args({4096, 8})
+    ->Args({8192, 8})
+    ->Unit(benchmark::kMillisecond);
 
-// BENCHMARK(BM_digits_cvpv)
-//     ->Args({1024, 8})
-//     ->Args({2048, 8})
-//     ->Args({4096, 8})
-//     ->Args({8192, 8})
-//     ->Args({16384, 8})
-//     ->Unit(benchmark::kMillisecond);
+BENCHMARK(BM_digits_cvpv)
+    ->Args({1024, 8})
+    ->Args({2048, 8})
+    ->Args({4096, 8})
+    ->Args({8192, 8})
+    ->Unit(benchmark::kMillisecond);
 
-// BENCHMARK(BM_digits_pvcm)
-//     ->Args({1024, 8})
-//     ->Args({2048, 8})
-//     ->Args({4096, 8})
-//     ->Args({8192, 8})
-//     ->Args({16384, 8})
-//     ->Unit(benchmark::kMillisecond);
+BENCHMARK(BM_digits_pvcm)
+    ->Args({1024, 8})
+    ->Args({2048, 8})
+    ->Args({4096, 8})
+    ->Args({8192, 8})
+    ->Unit(benchmark::kMillisecond);
 
 BENCHMARK(BM_digits_pmcm)
     ->Args({1024, 8})
     ->Args({2048, 8})
     ->Args({4096, 8})
     ->Args({8192, 8})
-    // ->Args({16384, 8})
     ->Unit(benchmark::kMillisecond);
 
 BENCHMARK_MAIN(); 
