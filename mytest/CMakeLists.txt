@@ -84,26 +84,29 @@ if(SEAL_BUILD_EXAMPLES)
     # target_link_libraries(example PRIVATE OpenMP::OpenMP_CXX)
 
     # Benchmark for plain_blas.cpp
-    add_executable(plain_blas_bench ${CMAKE_CURRENT_LIST_DIR}/plain_blas.cpp)
-    target_link_libraries(plain_blas_bench PRIVATE ${BLAS_LIBRARIES} OpenMP::OpenMP_CXX)
-    if (BLAS_INCLUDE_DIRS)
-        target_include_directories(plain_blas_bench PRIVATE ${BLAS_INCLUDE_DIRS})
-    endif()
-    target_link_libraries(plain_blas_bench PRIVATE benchmark::benchmark pthread)
+    add_executable(plain_blas_bench)
+    target_sources(plain_blas_bench
+        PRIVATE
+            ${CMAKE_CURRENT_LIST_DIR}/plain_blas_bench.cpp
+            ${CMAKE_CURRENT_LIST_DIR}/plain_blas.cpp
+    )
+    target_link_libraries(plain_blas_bench PRIVATE benchmark::benchmark pthread OpenMP::OpenMP_CXX BLAS::BLAS)
 
     # Benchmark for plain_omp.cpp
-    add_executable(plain_omp_bench ${CMAKE_CURRENT_LIST_DIR}/plain_omp.cpp)
-    target_link_libraries(plain_omp_bench PRIVATE ${BLAS_LIBRARIES} OpenMP::OpenMP_CXX)
-    if (BLAS_INCLUDE_DIRS)
-        target_include_directories(plain_omp_bench PRIVATE ${BLAS_INCLUDE_DIRS})
-    endif()
-    target_link_libraries(plain_omp_bench PRIVATE benchmark::benchmark pthread)
+    add_executable(plain_omp_bench)
+    target_sources(plain_omp_bench
+        PRIVATE
+            ${CMAKE_CURRENT_LIST_DIR}/plain_omp_bench.cpp
+            ${CMAKE_CURRENT_LIST_DIR}/plain_omp.cpp
+    )
+    target_link_libraries(plain_omp_bench PRIVATE benchmark::benchmark pthread OpenMP::OpenMP_CXX)
 
     # Benchmark for coefficients_seal.cpp
     add_executable(coefficients_seal_bench)
 
     target_sources(coefficients_seal_bench
         PRIVATE
+            ${CMAKE_CURRENT_LIST_DIR}/coefficients_seal_bench.cpp
             ${CMAKE_CURRENT_LIST_DIR}/coefficients_seal.cpp
             ${CMAKE_CURRENT_LIST_DIR}/cpmm.cpp
             ${CMAKE_CURRENT_LIST_DIR}/utils.cpp
@@ -133,6 +136,7 @@ if(SEAL_BUILD_EXAMPLES)
     add_executable(coefficients_blas_bench)
     target_sources(coefficients_blas_bench
         PRIVATE
+            ${CMAKE_CURRENT_LIST_DIR}/coefficients_blas_bench.cpp
             ${CMAKE_CURRENT_LIST_DIR}/coefficients_blas.cpp
             ${CMAKE_CURRENT_LIST_DIR}/cpmm.cpp
             ${CMAKE_CURRENT_LIST_DIR}/cpscale.cpp

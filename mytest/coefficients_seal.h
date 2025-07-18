@@ -1,7 +1,6 @@
 #ifndef COEFFICIENTS_H
 #define COEFFICIENTS_H
 
-#include <benchmark/benchmark.h>
 #include "seal/seal.h"
 #include "seal/util/polyarithsmallmod.h"
 #include "cpmm.h"
@@ -14,20 +13,20 @@ using namespace seal;
 using namespace std;
 using json = nlohmann::json;
 
-void cvps(const SEALContext& context,
+void cvps_coefficients_seal(const SEALContext& context,
     const uint64_t scalar,
     const Ciphertext& encrypted_vector_coeff,
     Ciphertext& encrypted_vector_coeff_resul
 );
 
-void cvpv(
+void cvpv_coefficients_seal(
     const SEALContext& context,
     const vector<uint64_t>& clear_vector,
     const Ciphertext& encrypted_vector_coeff,
     vector<Ciphertext>& encrypted_vector_coeff_resul
 );
 
-void pvcm(
+void pvcm_coefficients_seal(
     const SEALContext& context,
     const Evaluator& evaluator,
     const vector<uint64_t>& clear_vector,
@@ -35,7 +34,7 @@ void pvcm(
     Ciphertext& encrypted_matrix_coeff_result
 );
 
-void pmcm(
+void pmcm_coefficients_seal(
     const SEALContext& context,
     const Evaluator& evaluator,
     const vector<vector<uint64_t>>& clear_matrix,

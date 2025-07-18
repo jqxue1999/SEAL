@@ -24,7 +24,7 @@ void cvpv_baseline(
     vector<Ciphertext>& encrypted_vector_coeff_result
 ) {
     encrypted_vector_coeff_result.resize(clear_vector.size());
-    // #pragma omp parallel for
+    #pragma omp parallel for
     for (size_t i = 0; i < clear_vector.size(); ++i) {
         cvps_baseline(context, batch_encoder, evaluator, clear_vector[i], encrypted_vector_coeff, encrypted_vector_coeff_result[i]);
     }
@@ -40,7 +40,7 @@ void pvcm_baseline(
 ) {
     cvps_baseline(context, batch_encoder, evaluator, clear_vector[0], encrypted_matrix_coeff[0], encrypted_matrix_coeff_result);
 
-    // #pragma omp parallel for
+    #pragma omp parallel for
     for (size_t i = 1; i < clear_vector.size(); i++) {
         Ciphertext partial;
         cvps_baseline(context, batch_encoder, evaluator, clear_vector[i], encrypted_matrix_coeff[i], partial);
@@ -57,7 +57,8 @@ void pmcm_baseline(
     vector<Ciphertext>& encrypted_matrix_coeff_result
 ) {
     encrypted_matrix_coeff_result.resize(clear_matrix.size());
-    // #pragma omp parallel for
-    for (size_t i = 0; i < clear_matrix.size(); i++)
+    #pragma omp parallel for
+    for (size_t i = 0; i < clear_matrix.size(); i++) {
         pvcm_baseline(context, batch_encoder, evaluator, clear_matrix[i], encrypted_matrix_coeff, encrypted_matrix_coeff_result[i]);
+    }
 }
