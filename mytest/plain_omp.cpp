@@ -8,6 +8,7 @@
 using namespace std;
 
 void cvps_omp(const vector<uint64>& x, uint64 scalar, vector<uint64>& result) {
+    result.resize(x.size());
     #pragma omp parallel for
     for (size_t i = 0; i < x.size(); ++i)
         result[i] = x[i] * scalar;
@@ -48,7 +49,7 @@ static void BM_cvps_omp(benchmark::State& state) {
         cvps_omp(x, scalar, result);
     }
 }
-BENCHMARK(BM_cvps_omp)->Arg(4096)->Arg(8192)->Arg(16384)->Unit(benchmark::kMillisecond);
+
 
 // Google Benchmark for cvpv_omp
 static void BM_cvpv_omp(benchmark::State& state) {
@@ -63,7 +64,7 @@ static void BM_cvpv_omp(benchmark::State& state) {
         cvpv_omp(x, y, result);
     }
 }
-BENCHMARK(BM_cvpv_omp)->Arg(4096)->Arg(8192)->Arg(16384)->Unit(benchmark::kMillisecond);
+
 
 // Google Benchmark for pvcm_omp
 static void BM_pvcm_omp(benchmark::State& state) {
@@ -79,7 +80,7 @@ static void BM_pvcm_omp(benchmark::State& state) {
         pvcm_omp(x, Y, result);
     }
 }
-BENCHMARK(BM_pvcm_omp)->Arg(4096)->Arg(8192)->Arg(16384)->Unit(benchmark::kMillisecond);
+
 
 // Google Benchmark for pmcm_omp
 static void BM_pmcm_omp(benchmark::State& state) {
@@ -94,6 +95,41 @@ static void BM_pmcm_omp(benchmark::State& state) {
         pmcm_omp(X, Y, result);
     }
 }
-BENCHMARK(BM_pmcm_omp)->Arg(4096)->Arg(8192)->Arg(16384)->Unit(benchmark::kMillisecond);
+
+// Google Benchmark for cvps_omp
+BENCHMARK(BM_cvps_omp)
+    ->Arg(1024)
+    ->Arg(2048)
+    // ->Arg(4096)
+    // ->Arg(8192)
+    // ->Arg(16384)
+    ->Unit(benchmark::kMillisecond);
+
+// Google Benchmark for cvpv_omp
+BENCHMARK(BM_cvpv_omp)
+    ->Arg(1024)
+    ->Arg(2048)
+    // ->Arg(4096)
+    // ->Arg(8192)
+    // ->Arg(16384)
+    ->Unit(benchmark::kMillisecond);
+
+// Google Benchmark for pvcm_omp
+BENCHMARK(BM_pvcm_omp)
+    ->Arg(1024)
+    ->Arg(2048)
+    // ->Arg(4096)
+    // ->Arg(8192)
+    // ->Arg(16384)
+    ->Unit(benchmark::kMillisecond);
+
+// Google Benchmark for pmcm_omp
+BENCHMARK(BM_pmcm_omp)
+    ->Arg(1024)
+    ->Arg(2048)
+    // ->Arg(4096)
+    // ->Arg(8192)
+    // ->Arg(16384)
+    ->Unit(benchmark::kMillisecond);
 
 BENCHMARK_MAIN(); 

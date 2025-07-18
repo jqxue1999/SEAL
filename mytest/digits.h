@@ -116,19 +116,7 @@ double initialize_zero_ciphertext(
     Encryptor& encryptor,
     Ciphertext& zero_ciphertext);
 
-/**
- * 对加密的位级向量执行通用标量乘法
- * 通过分解乘数为2的幂次方之和，然后相加
- * 
- * @param context SEAL上下文
- * @param encryptor 加密器
- * @param evaluator 计算器（用于密文加法）
- * @param zero_ciphertext 全零密文
- * @param encrypted_bit_vectors 加密的位级向量数组（64个Ciphertext）
- * @param multiplier 乘数
- * @param result_vectors 结果向量数组（64个Ciphertext）
- */
-vector<double> multiply_by_general_scalar(
+void cvps_digits(
     const SEALContext& context,
     Encryptor& encryptor,
     Evaluator& evaluator,
@@ -136,8 +124,7 @@ vector<double> multiply_by_general_scalar(
     const vector<Ciphertext>& encrypted_bit_vectors,
     uint64_t multiplier,
     vector<Ciphertext>& result_vectors,
-    int num_bits,
-    bool verbose = false);
+    int num_bits);
 
 /**
  * 验证通用向量乘法的正确性
@@ -152,21 +139,7 @@ bool verify_general_multiplication(
     uint64_t multiplier,
     const vector<uint64_t>& output_vector);
 
-/**
- * 计算明文向量和密文bit向量的外积，并验证正确性，返回是否全部正确
- * 
- * @param context SEAL上下文
- * @param encryptor 加密器
- * @param evaluator 计算器
- * @param decryptor 解密器
- * @param num_bits 位数
- * @param clear_vector 明文向量
- * @param bit_vectors_ciphertext 密文bit向量
- * @param outer_product_results 外积结果
- * @param verbose 是否打印详细信息
- * @return 时间消耗
- */
-vector<double> clear_vector_outer_product_with_encrypted_bits(
+void cvpv_digits(
     const SEALContext& context,
     Encryptor& encryptor,
     Evaluator& evaluator,
@@ -174,29 +147,26 @@ vector<double> clear_vector_outer_product_with_encrypted_bits(
     int num_bits,
     const vector<uint64_t>& clear_vector,
     const vector<Ciphertext>& bit_vectors_ciphertext,
-    vector<vector<Ciphertext>>& outer_product_results,
-    bool verbose = false);
+    vector<vector<Ciphertext>>& outer_product_results);
 
 // 计算明文向量和密文矩阵的乘积，结果为密文bit向量
-double clear_vector_times_encrypted_matrix(
+double pvcm_digits(
     const SEALContext& context,
     Encryptor& encryptor,
     Evaluator& evaluator,
     const vector<uint64_t>& clear_vector,
     const vector<vector<Ciphertext>>& encrypted_matrix,
     vector<Ciphertext>& result,
-    int num_bits,
-    bool verbose = false);
+    int num_bits);
 
 // 计算密文矩阵（按行密文bit向量）与明文矩阵的乘积，结果为密文bit向量矩阵
-double encrypted_matrix_times_clear_matrix(
+double pmcm_digits(
     const SEALContext& context,
     Encryptor& encryptor,
     Evaluator& evaluator,
     const vector<vector<Ciphertext>>& encrypted_matrix,
     const vector<vector<uint64_t>>& clear_matrix,
     vector<vector<Ciphertext>>& result,
-    int num_bits,
-    bool verbose = false);
+    int num_bits);
 
 #endif // DIGITS_H 

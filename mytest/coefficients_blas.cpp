@@ -1,18 +1,12 @@
-#include "coefficients_seal.h"
+#include "coefficients_blas.h"
 
 void cvps(
     const SEALContext& context,
     const uint64_t scalar,
     const Ciphertext& encrypted_vector_coeff,
     Ciphertext& encrypted_vector_coeff_result
-) {    
-    encrypted_vector_coeff_result = encrypted_vector_coeff;
-    EncryptionParameters parms = context.first_context_data()->parms();
-    
-    MemoryPoolHandle pool = MemoryManager::GetPool();
-    util::negacyclic_multiply_poly_mono_coeffmod(
-        encrypted_vector_coeff, encrypted_vector_coeff.size(), scalar, 0, parms.coeff_modulus(), encrypted_vector_coeff_result, pool
-    );
+) {        
+    scale_vector_blas(context, encrypted_vector_coeff, encrypted_vector_coeff_result, scalar);
 }
 
 void cvpv(
@@ -206,37 +200,37 @@ static void BM_pmcm(benchmark::State& state) {
 // Google Benchmark for cvps
 BENCHMARK(BM_cvps)
     ->Arg(1024)
-    ->Arg(2048)
-    ->Arg(4096)
-    ->Arg(8192)
-    ->Arg(16384)
+    // ->Arg(2048)
+    // ->Arg(4096)
+    // ->Arg(8192)
+    // ->Arg(16384)
     ->Unit(benchmark::kMillisecond);
 
 // Google Benchmark for cvpv
 BENCHMARK(BM_cvpv)
     ->Arg(1024)
-    ->Arg(2048)
-    ->Arg(4096)
-    ->Arg(8192)
-    ->Arg(16384)
+    // ->Arg(2048)
+    // ->Arg(4096)
+    // ->Arg(8192)
+    // ->Arg(16384)
     ->Unit(benchmark::kMillisecond);
 
 // Google Benchmark for pvcm
 BENCHMARK(BM_pvcm)
     ->Arg(1024)
-    ->Arg(2048)
-    ->Arg(4096)
-    ->Arg(8192)
-    ->Arg(16384)
+    // ->Arg(2048)
+    // ->Arg(4096)
+    // ->Arg(8192)
+    // ->Arg(16384)
     ->Unit(benchmark::kMillisecond);
 
 // Google Benchmark for pmcm
 BENCHMARK(BM_pmcm)
     ->Arg(1024)
-    ->Arg(2048)
-    ->Arg(4096)
-    ->Arg(8192)
-    ->Arg(16384)
+    // ->Arg(2048)
+    // ->Arg(4096)
+    // ->Arg(8192)
+    // ->Arg(16384)
     ->Unit(benchmark::kMillisecond);
 
 BENCHMARK_MAIN();

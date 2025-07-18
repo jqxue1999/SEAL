@@ -57,7 +57,6 @@ static void BM_cvps_blas(benchmark::State& state) {
         cvps_blas(x, scalar, result);
     }
 }
-BENCHMARK(BM_cvps_blas)->Arg(4096)->Arg(8192)->Arg(16384)->Unit(benchmark::kMillisecond);
 
 // Google Benchmark for cvpv_blas
 static void BM_cvpv_blas(benchmark::State& state) {
@@ -72,7 +71,6 @@ static void BM_cvpv_blas(benchmark::State& state) {
         cvpv_blas(x, y, result);
     }
 }
-BENCHMARK(BM_cvpv_blas)->Arg(4096)->Arg(8192)->Arg(16384)->Unit(benchmark::kMillisecond);
 
 // Google Benchmark for pvcm_blas
 static void BM_pvcm_blas(benchmark::State& state) {
@@ -88,7 +86,6 @@ static void BM_pvcm_blas(benchmark::State& state) {
         pvcm_blas(x, Y, result);
     }
 }
-BENCHMARK(BM_pvcm_blas)->Arg(4096)->Arg(8192)->Arg(16384)->Unit(benchmark::kMillisecond);
 
 // Google Benchmark for pmcm_blas
 static void BM_pmcm_blas(benchmark::State& state) {
@@ -103,6 +100,41 @@ static void BM_pmcm_blas(benchmark::State& state) {
         pmcm_blas(X, Y, result);
     }
 }
-BENCHMARK(BM_pmcm_blas)->Arg(4096)->Arg(8192)->Arg(16384)->Unit(benchmark::kMillisecond);
+
+// Google Benchmark for cvps_blas
+BENCHMARK(BM_cvps_blas)
+    ->Arg(1024)
+    // ->Arg(2048)
+    // ->Arg(4096)
+    // ->Arg(8192)
+    // ->Arg(16384)
+    ->Unit(benchmark::kMillisecond);
+
+// Google Benchmark for cvpv_blas
+BENCHMARK(BM_cvpv_blas)
+    ->Arg(1024)
+    // ->Arg(2048)
+    // ->Arg(4096)
+    // ->Arg(8192)
+    // ->Arg(16384)
+    ->Unit(benchmark::kMillisecond);
+
+// Google Benchmark for pvcm_blas
+BENCHMARK(BM_pvcm_blas)
+    ->Arg(1024)
+    // ->Arg(2048)
+    // ->Arg(4096)
+    // ->Arg(8192)
+    // ->Arg(16384)
+    ->Unit(benchmark::kMillisecond);
+
+// Google Benchmark for pmcm_blas
+BENCHMARK(BM_pmcm_blas)
+    ->Arg(1024)
+    // ->Arg(2048)
+    // ->Arg(4096)
+    // ->Arg(8192)
+    // ->Arg(16384)
+    ->Unit(benchmark::kMillisecond);
 
 BENCHMARK_MAIN(); 

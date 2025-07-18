@@ -1,14 +1,15 @@
 #ifndef COEFFICIENTS_H
 #define COEFFICIENTS_H
 
-#include <benchmark/benchmark.h>
 #include "seal/seal.h"
-#include "seal/util/polyarithsmallmod.h"
 #include "cpmm.h"
+#include "cpscale.h"
 #include "utils.h"
 #include <vector>
 #include <iostream>
 #include <nlohmann/json.hpp>
+#include <benchmark/benchmark.h>
+
 
 using namespace seal;
 using namespace std;
