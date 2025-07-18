@@ -7,11 +7,10 @@
 #include <omp.h>
 
 using std::vector;
-using uint64 = uint64_t;
 
-void cvps_plain_blas(const vector<uint64>& x, uint64 scalar, vector<uint64>& result);
-void cvpv_plain_blas(const vector<uint64>& x, const vector<uint64>& y, vector<vector<uint64>>& result);
-void pvcm_plain_blas(const vector<uint64>& x, const vector<vector<uint64>>& Y, vector<uint64>& result);
-void pmcm_plain_blas(const vector<vector<uint64>>& X, const vector<vector<uint64>>& Y, vector<vector<uint64>>& result);
+void cvps_plain_blas(const vector<double>& x, double scalar, vector<double>& result);
+void cvpv_plain_blas(const vector<double>& x, const vector<double>& y, vector<vector<double>>& result);
+void pvcm_plain_blas(const vector<double>& x, const vector<vector<double>>& Y, vector<double>& result);
+void pmcm_plain_blas(const vector<vector<double>>& X, const vector<vector<double>>& Y, vector<vector<double>>& result);
 
 #endif // PLAIN_BLAS_H 

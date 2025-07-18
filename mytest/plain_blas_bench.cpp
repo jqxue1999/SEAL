@@ -6,12 +6,12 @@
 // Google Benchmark for cvps_blas
 static void BM_cvps_plain_blas(benchmark::State& state) {
     size_t dim = static_cast<size_t>(state.range(0));
-    uint64 scalar = 123;
+    double scalar = 123.0;
     std::mt19937_64 rng(42);
-    std::uniform_int_distribution<uint64> dist(0, 1000);
-    vector<uint64> x(dim);
+    std::uniform_real_distribution<double> dist(0.0, 1000.0);
+    std::vector<double> x(dim);
     for (auto& v : x) v = dist(rng);
-    vector<uint64> result;
+    std::vector<double> result;
     for (auto _ : state) {
         cvps_plain_blas(x, scalar, result);
     }
@@ -21,11 +21,11 @@ static void BM_cvps_plain_blas(benchmark::State& state) {
 static void BM_cvpv_plain_blas(benchmark::State& state) {
     size_t dim = static_cast<size_t>(state.range(0));
     std::mt19937_64 rng(42);
-    std::uniform_int_distribution<uint64> dist(0, 1000);
-    vector<uint64> x(dim), y(dim);
+    std::uniform_real_distribution<double> dist(0.0, 1000.0);
+    std::vector<double> x(dim), y(dim);
     for (auto& v : x) v = dist(rng);
     for (auto& v : y) v = dist(rng);
-    vector<vector<uint64>> result;
+    std::vector<std::vector<double>> result;
     for (auto _ : state) {
         cvpv_plain_blas(x, y, result);
     }
@@ -35,12 +35,12 @@ static void BM_cvpv_plain_blas(benchmark::State& state) {
 static void BM_pvcm_plain_blas(benchmark::State& state) {
     size_t dim = static_cast<size_t>(state.range(0));
     std::mt19937_64 rng(42);
-    std::uniform_int_distribution<uint64> dist(0, 1000);
-    vector<uint64> x(dim);
+    std::uniform_real_distribution<double> dist(0.0, 1000.0);
+    std::vector<double> x(dim);
     for (auto& v : x) v = dist(rng);
-    vector<vector<uint64>> Y(dim, vector<uint64>(dim));
+    std::vector<std::vector<double>> Y(dim, std::vector<double>(dim));
     for (auto& row : Y) for (auto& v : row) v = dist(rng);
-    vector<uint64> result;
+    std::vector<double> result;
     for (auto _ : state) {
         pvcm_plain_blas(x, Y, result);
     }
@@ -50,11 +50,11 @@ static void BM_pvcm_plain_blas(benchmark::State& state) {
 static void BM_pmcm_plain_blas(benchmark::State& state) {
     size_t dim = static_cast<size_t>(state.range(0));
     std::mt19937_64 rng(42);
-    std::uniform_int_distribution<uint64> dist(0, 1000);
-    vector<vector<uint64>> X(dim, vector<uint64>(dim)), Y(dim, vector<uint64>(dim));
+    std::uniform_real_distribution<double> dist(0.0, 1000.0);
+    std::vector<std::vector<double>> X(dim, std::vector<double>(dim)), Y(dim, std::vector<double>(dim));
     for (auto& row : X) for (auto& v : row) v = dist(rng);
     for (auto& row : Y) for (auto& v : row) v = dist(rng);
-    vector<vector<uint64>> result;
+    std::vector<std::vector<double>> result;
     for (auto _ : state) {
         pmcm_plain_blas(X, Y, result);
     }
