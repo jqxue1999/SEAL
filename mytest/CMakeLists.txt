@@ -109,7 +109,7 @@ if(SEAL_BUILD_EXAMPLES)
             ${CMAKE_CURRENT_LIST_DIR}/coefficients_seal_bench.cpp
             ${CMAKE_CURRENT_LIST_DIR}/coefficients_seal.cpp
             ${CMAKE_CURRENT_LIST_DIR}/cpmm.cpp
-            ${CMAKE_CURRENT_LIST_DIR}/utils.cpp
+            ${CMAKE_CURRENT_LIST_DIR}/coeff_modulus_config.cpp
     )
 
     if(TARGET SEAL::seal)
@@ -140,7 +140,7 @@ if(SEAL_BUILD_EXAMPLES)
             ${CMAKE_CURRENT_LIST_DIR}/coefficients_blas.cpp
             ${CMAKE_CURRENT_LIST_DIR}/cpmm.cpp
             ${CMAKE_CURRENT_LIST_DIR}/cpscale.cpp
-            ${CMAKE_CURRENT_LIST_DIR}/utils.cpp
+            ${CMAKE_CURRENT_LIST_DIR}/coeff_modulus_config.cpp
     )
 
     if(TARGET SEAL::seal)
@@ -169,8 +169,8 @@ if(SEAL_BUILD_EXAMPLES)
         PRIVATE
             ${CMAKE_CURRENT_LIST_DIR}/digits_bench.cpp
             ${CMAKE_CURRENT_LIST_DIR}/digits.cpp
-            ${CMAKE_CURRENT_LIST_DIR}/utils.cpp
             ${CMAKE_CURRENT_LIST_DIR}/cpmm.cpp
+            ${CMAKE_CURRENT_LIST_DIR}/coeff_modulus_config.cpp
     )
 
     if(TARGET SEAL::seal)
@@ -199,7 +199,7 @@ if(SEAL_BUILD_EXAMPLES)
         PRIVATE
             ${CMAKE_CURRENT_LIST_DIR}/baseline_bench.cpp
             ${CMAKE_CURRENT_LIST_DIR}/baseline.cpp
-            ${CMAKE_CURRENT_LIST_DIR}/utils.cpp
+            ${CMAKE_CURRENT_LIST_DIR}/coeff_modulus_config.cpp
     )
 
     if(TARGET SEAL::seal)

@@ -1,15 +1,13 @@
 #include <benchmark/benchmark.h>
 #include "digits.h"
 #include <iostream>
-#include <nlohmann/json.hpp>
-using json = nlohmann::json;
+#include "coeff_modulus_config.h"
 
 static void BM_digits_cvps(benchmark::State& state) {
     size_t poly_modulus_degree = static_cast<size_t>(state.range(0));
     int num_bits = static_cast<int>(state.range(1));
     
-    json config = read_seal_config("/home/jiaq/Research/SEAL/mytest/seal_config.json");
-    vector<int> coeff_modulus_params = get_coeff_modulus_params(config, poly_modulus_degree);
+    std::vector<int> coeff_modulus_params = CoeffModulusConfig::get_coeff_modulus_params(poly_modulus_degree);
     scheme_type scheme = scheme_type::bfv;
     EncryptionParameters parms(scheme);
     parms.set_poly_modulus_degree(poly_modulus_degree);
@@ -48,8 +46,7 @@ static void BM_digits_cvpv(benchmark::State& state) {
     size_t poly_modulus_degree = static_cast<size_t>(state.range(0));
     int num_bits = static_cast<int>(state.range(1));
     
-    json config = read_seal_config("/home/jiaq/Research/SEAL/mytest/seal_config.json");
-    vector<int> coeff_modulus_params = get_coeff_modulus_params(config, poly_modulus_degree);
+    std::vector<int> coeff_modulus_params = CoeffModulusConfig::get_coeff_modulus_params(poly_modulus_degree);
     scheme_type scheme = scheme_type::bfv;
     EncryptionParameters parms(scheme);
     parms.set_poly_modulus_degree(poly_modulus_degree);
@@ -91,8 +88,7 @@ static void BM_digits_pvcm(benchmark::State& state) {
     size_t poly_modulus_degree = static_cast<size_t>(state.range(0));
     int num_bits = static_cast<int>(state.range(1));
     
-    json config = read_seal_config("/home/jiaq/Research/SEAL/mytest/seal_config.json");
-    vector<int> coeff_modulus_params = get_coeff_modulus_params(config, poly_modulus_degree);
+    std::vector<int> coeff_modulus_params = CoeffModulusConfig::get_coeff_modulus_params(poly_modulus_degree);
     scheme_type scheme = scheme_type::bfv;
     EncryptionParameters parms(scheme);
     parms.set_poly_modulus_degree(poly_modulus_degree);
@@ -137,8 +133,7 @@ static void BM_digits_pmcm(benchmark::State& state) {
     size_t poly_modulus_degree = static_cast<size_t>(state.range(0));
     int num_bits = static_cast<int>(state.range(1));
     
-    json config = read_seal_config("/home/jiaq/Research/SEAL/mytest/seal_config.json");
-    vector<int> coeff_modulus_params = get_coeff_modulus_params(config, poly_modulus_degree);
+    std::vector<int> coeff_modulus_params = CoeffModulusConfig::get_coeff_modulus_params(poly_modulus_degree);
     scheme_type scheme = scheme_type::bfv;
     EncryptionParameters parms(scheme);
     parms.set_poly_modulus_degree(poly_modulus_degree);

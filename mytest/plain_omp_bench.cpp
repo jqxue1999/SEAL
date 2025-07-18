@@ -1,5 +1,6 @@
 #include <benchmark/benchmark.h>
 #include "plain_omp.h"
+#include "coeff_modulus_config.h"
 
 // Google Benchmark for cvps_omp
 static void BM_cvps_plain_omp(benchmark::State& state) {

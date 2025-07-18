@@ -1,6 +1,7 @@
 #include <benchmark/benchmark.h>
 #include "plain_blas.h"
 #include <random>
+#include "coeff_modulus_config.h"
 
 // Google Benchmark for cvps_blas
 static void BM_cvps_plain_blas(benchmark::State& state) {

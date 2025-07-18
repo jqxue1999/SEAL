@@ -1,15 +1,12 @@
 #include <benchmark/benchmark.h>
 #include "baseline.h"
-#include "utils.h"
 #include <iostream>
-#include <nlohmann/json.hpp>
+#include "coeff_modulus_config.h"
 
-using json = nlohmann::json;
 // Google Benchmark for cvps baseline
 static void BM_cvps_baseline(benchmark::State& state) {
     size_t poly_modulus_degree = static_cast<size_t>(state.range(0));
-    json config = read_seal_config("/home/jiaq/Research/SEAL/mytest/seal_config.json");
-    vector<int> coeff_modulus_params = get_coeff_modulus_params(config, poly_modulus_degree);
+    std::vector<int> coeff_modulus_params = CoeffModulusConfig::get_coeff_modulus_params(poly_modulus_degree);
     
     scheme_type scheme = scheme_type::bfv;
     EncryptionParameters parms(scheme);
@@ -45,8 +42,7 @@ static void BM_cvps_baseline(benchmark::State& state) {
 // Google Benchmark for cvpv baseline
 static void BM_cvpv_baseline(benchmark::State& state) {
     size_t poly_modulus_degree = static_cast<size_t>(state.range(0));
-    json config = read_seal_config("/home/jiaq/Research/SEAL/mytest/seal_config.json");
-    vector<int> coeff_modulus_params = get_coeff_modulus_params(config, poly_modulus_degree);
+    std::vector<int> coeff_modulus_params = CoeffModulusConfig::get_coeff_modulus_params(poly_modulus_degree);
     
     scheme_type scheme = scheme_type::bfv;
     EncryptionParameters parms(scheme);
@@ -83,8 +79,7 @@ static void BM_cvpv_baseline(benchmark::State& state) {
 // Google Benchmark for pvcm baseline
 static void BM_pvcm_baseline(benchmark::State& state) {
     size_t poly_modulus_degree = static_cast<size_t>(state.range(0));
-    json config = read_seal_config("/home/jiaq/Research/SEAL/mytest/seal_config.json");
-    vector<int> coeff_modulus_params = get_coeff_modulus_params(config, poly_modulus_degree);
+    std::vector<int> coeff_modulus_params = CoeffModulusConfig::get_coeff_modulus_params(poly_modulus_degree);
     
     scheme_type scheme = scheme_type::bfv;
     EncryptionParameters parms(scheme);
@@ -125,8 +120,7 @@ static void BM_pvcm_baseline(benchmark::State& state) {
 // Google Benchmark for pmcm baseline
 static void BM_pmcm_baseline(benchmark::State& state) {
     size_t poly_modulus_degree = static_cast<size_t>(state.range(0));
-    json config = read_seal_config("/home/jiaq/Research/SEAL/mytest/seal_config.json");
-    vector<int> coeff_modulus_params = get_coeff_modulus_params(config, poly_modulus_degree);
+    std::vector<int> coeff_modulus_params = CoeffModulusConfig::get_coeff_modulus_params(poly_modulus_degree);
 
     scheme_type scheme = scheme_type::bfv;
     EncryptionParameters parms(scheme);

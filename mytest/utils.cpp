@@ -142,3 +142,4 @@ vector<int> get_coeff_modulus_params(const json& config, size_t poly_modulus_deg
         return vector<int>();
     }
 }
+

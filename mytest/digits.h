@@ -10,7 +10,6 @@
 #include "seal/util/uintarith.h"
 #include "seal/util/uintcore.h"
 #include "seal/util/uintarithsmallmod.h"
-#include "utils.h"
 #include <vector>
 #include <cstdint>
 #include <iostream>

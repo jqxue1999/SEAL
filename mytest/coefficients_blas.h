@@ -4,10 +4,9 @@
 #include "seal/seal.h"
 #include "cpmm.h"
 #include "cpscale.h"
-#include "utils.h"
 #include <vector>
 #include <iostream>
-#include <nlohmann/json.hpp>
+#include "coeff_modulus_config.h"
 
 
 using namespace seal;

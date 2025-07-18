@@ -1,11 +1,11 @@
 #include "coefficients_blas.h"
 #include <benchmark/benchmark.h>
+#include "coeff_modulus_config.h"
 
 // Google Benchmark for cvps
 static void BM_cvps_coefficients_blas(benchmark::State& state) {
     size_t poly_modulus_degree = static_cast<size_t>(state.range(0));
-    json config = read_seal_config("/home/jiaq/Research/SEAL/mytest/seal_config.json");
-    vector<int> coeff_modulus_params = get_coeff_modulus_params(config, poly_modulus_degree);
+    std::vector<int> coeff_modulus_params = CoeffModulusConfig::get_coeff_modulus_params(poly_modulus_degree);
     scheme_type scheme = scheme_type::bfv;
     EncryptionParameters parms(scheme);
     parms.set_poly_modulus_degree(poly_modulus_degree);
@@ -37,8 +37,7 @@ static void BM_cvps_coefficients_blas(benchmark::State& state) {
 // Google Benchmark for cvpv
 static void BM_cvpv_coefficients_blas(benchmark::State& state) {
     size_t poly_modulus_degree = static_cast<size_t>(state.range(0));
-    json config = read_seal_config("/home/jiaq/Research/SEAL/mytest/seal_config.json");
-    vector<int> coeff_modulus_params = get_coeff_modulus_params(config, poly_modulus_degree);
+    std::vector<int> coeff_modulus_params = CoeffModulusConfig::get_coeff_modulus_params(poly_modulus_degree);
     scheme_type scheme = scheme_type::bfv;
     EncryptionParameters parms(scheme);
     parms.set_poly_modulus_degree(poly_modulus_degree);
@@ -71,8 +70,7 @@ static void BM_cvpv_coefficients_blas(benchmark::State& state) {
 // Google Benchmark for pvcm
 static void BM_pvcm_coefficients_blas(benchmark::State& state) {
     size_t poly_modulus_degree = static_cast<size_t>(state.range(0));
-    json config = read_seal_config("/home/jiaq/Research/SEAL/mytest/seal_config.json");
-    vector<int> coeff_modulus_params = get_coeff_modulus_params(config, poly_modulus_degree);
+    std::vector<int> coeff_modulus_params = CoeffModulusConfig::get_coeff_modulus_params(poly_modulus_degree);
     scheme_type scheme = scheme_type::bfv;
     EncryptionParameters parms(scheme);
     parms.set_poly_modulus_degree(poly_modulus_degree);
@@ -110,8 +108,7 @@ static void BM_pvcm_coefficients_blas(benchmark::State& state) {
 // Google Benchmark for pmcm
 static void BM_pmcm_coefficients_blas(benchmark::State& state) {
     size_t poly_modulus_degree = static_cast<size_t>(state.range(0));
-    json config = read_seal_config("/home/jiaq/Research/SEAL/mytest/seal_config.json");
-    vector<int> coeff_modulus_params = get_coeff_modulus_params(config, poly_modulus_degree);
+    std::vector<int> coeff_modulus_params = CoeffModulusConfig::get_coeff_modulus_params(poly_modulus_degree);
     scheme_type scheme = scheme_type::bfv;
     EncryptionParameters parms(scheme);
     parms.set_poly_modulus_degree(poly_modulus_degree);

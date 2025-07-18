@@ -4,14 +4,12 @@
 #include "seal/seal.h"
 #include "seal/util/polyarithsmallmod.h"
 #include "cpmm.h"
-#include "utils.h"
+#include "coeff_modulus_config.h"
 #include <vector>
 #include <iostream>
-#include <nlohmann/json.hpp>
 
 using namespace seal;
 using namespace std;
-using json = nlohmann::json;
 
 void cvps_coefficients_seal(const SEALContext& context,
     const uint64_t scalar,
