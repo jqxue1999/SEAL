@@ -14,6 +14,7 @@ static void BM_cvps_plain_blas(benchmark::State& state) {
     std::vector<double> result;
     for (auto _ : state) {
         cvps_plain_blas(x, scalar, result);
+        benchmark::DoNotOptimize(result);
     }
 }
 
@@ -28,6 +29,7 @@ static void BM_cvpv_plain_blas(benchmark::State& state) {
     std::vector<std::vector<double>> result;
     for (auto _ : state) {
         cvpv_plain_blas(x, y, result);
+        benchmark::DoNotOptimize(result);
     }
 }
 
@@ -43,6 +45,7 @@ static void BM_pvcm_plain_blas(benchmark::State& state) {
     std::vector<double> result;
     for (auto _ : state) {
         pvcm_plain_blas(x, Y, result);
+        benchmark::DoNotOptimize(result);
     }
 }
 
@@ -57,6 +60,7 @@ static void BM_pmcm_plain_blas(benchmark::State& state) {
     std::vector<std::vector<double>> result;
     for (auto _ : state) {
         pmcm_plain_blas(X, Y, result);
+        benchmark::DoNotOptimize(result);
     }
 }
 

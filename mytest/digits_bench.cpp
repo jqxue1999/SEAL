@@ -39,6 +39,7 @@ static void BM_cvps_digits(benchmark::State& state) {
     for (auto _ : state) {
         vector<Ciphertext> result_vectors;
         cvps_digits(context, encryptor, evaluator, zero_ciphertext, encrypted_bit_vectors, multiplier, result_vectors, num_bits);
+        benchmark::DoNotOptimize(result_vectors);
     }
 }
 
@@ -81,6 +82,7 @@ static void BM_cvpv_digits(benchmark::State& state) {
     for (auto _ : state) {
         vector<vector<Ciphertext>> outer_product_results;
         cvpv_digits(context, encryptor, evaluator, decryptor, num_bits, clear_vector, encrypted_bit_vectors, outer_product_results);
+        benchmark::DoNotOptimize(outer_product_results);
     }
 }
 
@@ -126,6 +128,7 @@ static void BM_pvcm_digits(benchmark::State& state) {
     for (auto _ : state) {
         vector<Ciphertext> result;
         pvcm_digits(context, encryptor, evaluator, clear_vector, encrypted_matrix, result, num_bits);
+        benchmark::DoNotOptimize(result);
     }
 }
 
@@ -175,6 +178,7 @@ static void BM_pmcm_digits(benchmark::State& state) {
     for (auto _ : state) {
         vector<vector<Ciphertext>> result;
         pmcm_digits(context, encryptor, evaluator, encrypted_matrix_A, plain_matrix_B, result, num_bits);
+        benchmark::DoNotOptimize(result);
     }
 }
 

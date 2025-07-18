@@ -31,6 +31,7 @@ static void BM_cvps_coefficients_blas(benchmark::State& state) {
 
     for (auto _ : state) {
         cvps_coefficients_blas(context, scalar, encrypted_vector_coeff, encrypted_vector_coeff_result);
+        benchmark::DoNotOptimize(encrypted_vector_coeff_result);
     }
 }
 
@@ -64,6 +65,7 @@ static void BM_cvpv_coefficients_blas(benchmark::State& state) {
 
     for (auto _ : state) {
         cvpv_coefficients_blas(context, clear_vector, encrypted_vector_coeff, encrypted_vector_coeff_result);
+        benchmark::DoNotOptimize(encrypted_vector_coeff_result);
     }
 }
 
@@ -102,6 +104,7 @@ static void BM_pvcm_coefficients_blas(benchmark::State& state) {
 
     for (auto _ : state) {
         pvcm_coefficients_blas(context, evaluator, clear_vector, encrypted_matrix_coeff, encrypted_matrix_coeff_result);
+        benchmark::DoNotOptimize(encrypted_matrix_coeff_result);
     }
 }
 
@@ -140,6 +143,7 @@ static void BM_pmcm_coefficients_blas(benchmark::State& state) {
 
     for (auto _ : state) {
         pmcm_coefficients_blas(context, evaluator, clear_matrix, encrypted_matrix_coeff, encrypted_matrix_coeff_result);
+        benchmark::DoNotOptimize(encrypted_matrix_coeff_result);
     }
 }
 

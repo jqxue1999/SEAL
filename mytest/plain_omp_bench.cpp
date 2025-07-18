@@ -13,6 +13,7 @@ static void BM_cvps_plain_omp(benchmark::State& state) {
     vector<uint64> result;
     for (auto _ : state) {
         cvps_plain_omp(x, scalar, result);
+        benchmark::DoNotOptimize(result);
     }
 }
 
@@ -28,6 +29,7 @@ static void BM_cvpv_plain_omp(benchmark::State& state) {
     vector<vector<uint64>> result;
     for (auto _ : state) {
         cvpv_plain_omp(x, y, result);
+        benchmark::DoNotOptimize(result);
     }
 }
 
@@ -44,6 +46,7 @@ static void BM_pvcm_plain_omp(benchmark::State& state) {
     vector<uint64> result;
     for (auto _ : state) {
         pvcm_plain_omp(x, Y, result);
+        benchmark::DoNotOptimize(result);
     }
 }
 
@@ -59,6 +62,7 @@ static void BM_pmcm_plain_omp(benchmark::State& state) {
     vector<vector<uint64>> result;
     for (auto _ : state) {
         pmcm_plain_omp(X, Y, result);
+        benchmark::DoNotOptimize(result);
     }
 }
 

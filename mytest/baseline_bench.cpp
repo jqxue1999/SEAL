@@ -36,6 +36,7 @@ static void BM_cvps_baseline(benchmark::State& state) {
 
     for (auto _ : state) {
         cvps_baseline(context, batch_encoder, evaluator, scalar, encrypted_vector_coeff, encrypted_vector_coeff_result);
+        benchmark::DoNotOptimize(encrypted_vector_coeff_result);
     }
 }
 
@@ -73,6 +74,7 @@ static void BM_cvpv_baseline(benchmark::State& state) {
 
     for (auto _ : state) {
         cvpv_baseline(context, batch_encoder, evaluator, clear_vector, encrypted_vector_coeff, encrypted_vector_coeff_result);
+        benchmark::DoNotOptimize(encrypted_vector_coeff_result);
     }
 }
 
@@ -114,6 +116,7 @@ static void BM_pvcm_baseline(benchmark::State& state) {
 
     for (auto _ : state) {
         pvcm_baseline(context, batch_encoder, evaluator, clear_vector, encrypted_matrix_coeff, encrypted_matrix_coeff_result);
+        benchmark::DoNotOptimize(encrypted_matrix_coeff_result);
     }
 }
 
@@ -155,6 +158,7 @@ static void BM_pmcm_baseline(benchmark::State& state) {
 
     for (auto _ : state) {
         pmcm_baseline(context, batch_encoder, evaluator, clear_matrix, encrypted_matrix_coeff, encrypted_matrix_coeff_result);
+        benchmark::DoNotOptimize(encrypted_matrix_coeff_result);
     }
 }
 
