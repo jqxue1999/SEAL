@@ -1,0 +1,138 @@
+----------------------------------------------------------------
+Baseline                       Time             CPU   Iterations
+----------------------------------------------------------------
+BM_cvps_baseline/1024      0.018 ms        0.018 ms        39101
+BM_cvps_baseline/2048      0.035 ms        0.035 ms        20233
+BM_cvps_baseline/4096      0.085 ms        0.085 ms         8674
+BM_cvps_baseline/8192      0.235 ms        0.235 ms         2965
+BM_cvpv_baseline/1024       6.83 ms         6.83 ms          101
+BM_cvpv_baseline/2048       13.6 ms         13.6 ms           51
+BM_cvpv_baseline/4096       36.0 ms         36.0 ms           19
+BM_cvpv_baseline/8192        210 ms          202 ms            3
+BM_pvcm_baseline/1024       7.59 ms         7.59 ms           92
+BM_pvcm_baseline/2048       9.70 ms         9.70 ms           75
+BM_pvcm_baseline/4096       44.3 ms         44.3 ms           16
+BM_pvcm_baseline/8192        306 ms          305 ms            2
+BM_pmcm_baseline/1024       7932 ms         7803 ms            1
+BM_pmcm_baseline/2048      25930 ms        23520 ms            1
+BM_pmcm_baseline/4096     183903 ms       161532 ms            1
+BM_pmcm_baseline/8192    1977156 ms      1971218 ms            1
+
+-------------------------------------------------------------------------
+Coefficients_SEAL                       Time             CPU   Iterations
+-------------------------------------------------------------------------
+BM_cvps_coefficients_seal/1024      0.005 ms        0.005 ms       123281
+BM_cvps_coefficients_seal/2048      0.009 ms        0.009 ms        77981
+BM_cvps_coefficients_seal/4096      0.030 ms        0.030 ms        22732
+BM_cvps_coefficients_seal/8192      0.115 ms        0.115 ms         5961
+BM_cvpv_coefficients_seal/1024       3.52 ms         3.52 ms          198
+BM_cvpv_coefficients_seal/2048       9.01 ms         9.01 ms           77
+BM_cvpv_coefficients_seal/4096       45.3 ms         45.2 ms           16
+BM_cvpv_coefficients_seal/8192        237 ms          237 ms            3
+BM_pvcm_coefficients_seal/1024       4.12 ms         4.12 ms          168
+BM_pvcm_coefficients_seal/2048       9.96 ms         9.95 ms           66
+BM_pvcm_coefficients_seal/4096       37.2 ms         37.2 ms           19
+BM_pvcm_coefficients_seal/8192        205 ms          205 ms            3
+BM_pmcm_coefficients_seal/1024       4530 ms         4529 ms            1
+BM_pmcm_coefficients_seal/2048      21758 ms        21684 ms            1
+BM_pmcm_coefficients_seal/4096     173331 ms       170433 ms            1
+BM_pmcm_coefficients_seal/8192    1392700 ms      1364963 ms            1
+
+-------------------------------------------------------------------------
+Coefficients_BLAS                       Time             CPU   Iterations
+-------------------------------------------------------------------------
+BM_cvps_coefficients_blas/1024      0.173 ms        0.173 ms         3195
+BM_cvps_coefficients_blas/2048      0.469 ms        0.469 ms         1679
+BM_cvps_coefficients_blas/4096       1.70 ms         1.70 ms          366
+BM_cvps_coefficients_blas/8192       3.44 ms         3.44 ms          239
+BM_cvpv_coefficients_blas/1024       15.5 ms         15.5 ms           45
+BM_cvpv_coefficients_blas/2048       31.6 ms         31.6 ms           22
+BM_cvpv_coefficients_blas/4096        249 ms          248 ms            3
+BM_cvpv_coefficients_blas/8192       1148 ms         1131 ms            1
+BM_pvcm_coefficients_blas/1024       15.7 ms         15.7 ms           45
+BM_pvcm_coefficients_blas/2048       32.0 ms         32.0 ms           22
+BM_pvcm_coefficients_blas/4096        248 ms          248 ms            3
+BM_pvcm_coefficients_blas/8192       1151 ms         1143 ms            1
+BM_pmcm_coefficients_blas/1024      15626 ms        15595 ms            1
+BM_pmcm_coefficients_blas/2048      62549 ms        62157 ms            1
+BM_pmcm_coefficients_blas/4096    1000101 ms      1000079 ms            1
+
+-----------------------------------------------------------------
+Plain_OPS                       Time             CPU   Iterations
+-----------------------------------------------------------------
+BM_cvps_plain_omp/1024      0.009 ms        0.009 ms        78295
+BM_cvps_plain_omp/2048      0.009 ms        0.009 ms        77845
+BM_cvps_plain_omp/4096      0.009 ms        0.009 ms        69155
+BM_cvps_plain_omp/8192      0.010 ms        0.010 ms        67232
+BM_cvpv_plain_omp/1024      0.249 ms        0.249 ms         2753
+BM_cvpv_plain_omp/2048      0.964 ms        0.960 ms          758
+BM_cvpv_plain_omp/4096       5.61 ms         5.50 ms          120
+BM_cvpv_plain_omp/8192       23.5 ms         22.9 ms           28
+BM_pvcm_plain_omp/1024       1.57 ms         1.57 ms          444
+BM_pvcm_plain_omp/2048       5.36 ms         5.36 ms          131
+BM_pvcm_plain_omp/4096       19.8 ms         19.8 ms           35
+BM_pvcm_plain_omp/8192       75.6 ms         75.6 ms            9
+BM_pmcm_plain_omp/1024        697 ms          668 ms            1
+BM_pmcm_plain_omp/2048       5213 ms         5191 ms            1
+BM_pmcm_plain_omp/4096      41050 ms        40419 ms            1
+BM_pmcm_plain_omp/8192     329741 ms       327347 ms            1
+
+------------------------------------------------------------------
+Plain_BLAS                       Time             CPU   Iterations
+------------------------------------------------------------------
+BM_cvps_plain_blas/1024       7.44 ms         7.44 ms          101
+BM_cvps_plain_blas/2048       5.15 ms         4.98 ms          267
+BM_cvps_plain_blas/4096       4.33 ms         4.27 ms         1000
+BM_cvps_plain_blas/8192       2.73 ms         2.59 ms          330
+BM_cvpv_plain_blas/1024       7.50 ms         7.09 ms          100
+BM_cvpv_plain_blas/2048       5.81 ms         5.65 ms          122
+BM_cvpv_plain_blas/4096       16.6 ms         15.2 ms           45
+BM_cvpv_plain_blas/8192       49.2 ms         41.8 ms           13
+BM_pvcm_plain_blas/1024       7.58 ms         7.35 ms          134
+BM_pvcm_plain_blas/2048       12.5 ms         12.4 ms           59
+BM_pvcm_plain_blas/4096       33.6 ms         29.2 ms           23
+BM_pvcm_plain_blas/8192        110 ms         95.7 ms            9
+BM_pmcm_plain_blas/1024       1160 ms          864 ms            1
+BM_pmcm_plain_blas/2048       7727 ms         7244 ms            1
+BM_pmcm_plain_blas/4096      61262 ms        57750 ms            1
+BM_pmcm_plain_blas/8192     489615 ms       464838 ms            1
+
+------------------------------------------------------------------
+Plain_BLAS (double)              Time             CPU   Iterations
+------------------------------------------------------------------
+BM_cvps_plain_blas/1024       7.25 ms         7.19 ms          119
+BM_cvps_plain_blas/2048       5.90 ms         5.85 ms          100
+BM_cvps_plain_blas/4096      0.840 ms        0.828 ms          855
+BM_cvps_plain_blas/8192       6.71 ms         6.60 ms          102
+BM_cvpv_plain_blas/1024       7.56 ms         7.16 ms           93
+BM_cvpv_plain_blas/2048       10.0 ms         9.69 ms           65
+BM_cvpv_plain_blas/4096       21.3 ms         21.2 ms           32
+BM_cvpv_plain_blas/8192       64.4 ms         63.2 ms           11
+BM_pvcm_plain_blas/1024       4.62 ms         4.59 ms          173
+BM_pvcm_plain_blas/2048       10.1 ms         10.0 ms           63
+BM_pvcm_plain_blas/4096       29.1 ms         26.8 ms           24
+BM_pvcm_plain_blas/8192       95.5 ms         81.8 ms            8
+BM_pmcm_plain_blas/1024        770 ms          698 ms            1
+BM_pmcm_plain_blas/2048       5730 ms         5230 ms            1
+BM_pmcm_plain_blas/4096      43656 ms        41271 ms            1
+BM_pmcm_plain_blas/8192     347698 ms       330882 ms            1
+
+----------------------------------------------------------------
+Digits                         Time             CPU   Iterations
+----------------------------------------------------------------
+BM_cvps_digits/1024/8      0.064 ms        0.064 ms        10000
+BM_cvps_digits/2048/8      0.044 ms        0.044 ms        13728
+BM_cvps_digits/4096/8      0.141 ms        0.141 ms         6767
+BM_cvps_digits/8192/8      0.230 ms        0.230 ms         6590
+BM_cvpv_digits/1024/8       27.6 ms         27.6 ms           25
+BM_cvpv_digits/2048/8       66.5 ms         66.4 ms            8
+BM_cvpv_digits/4096/8        292 ms          288 ms            2
+BM_cvpv_digits/8192/8       3982 ms         3858 ms            1
+BM_pvcm_digits/1024/8       17.1 ms         17.1 ms           40
+BM_pvcm_digits/2048/8       32.8 ms         32.8 ms           22
+BM_pvcm_digits/4096/8        205 ms          204 ms            3
+BM_pvcm_digits/8192/8       2717 ms         2703 ms            1
+BM_pmcm_digits/1024/8      17846 ms        17505 ms            1
+BM_pmcm_digits/2048/8      72783 ms        71890 ms            1
+BM_pmcm_digits/4096/8    1132259 ms      1124478 ms            1
+BM_pmcm_digits/8192/8   47823449 ms     45869095 ms            1

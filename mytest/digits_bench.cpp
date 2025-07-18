@@ -3,7 +3,7 @@
 #include <iostream>
 #include "coeff_modulus_config.h"
 
-static void BM_digits_cvps(benchmark::State& state) {
+static void BM_cvps_digits(benchmark::State& state) {
     size_t poly_modulus_degree = static_cast<size_t>(state.range(0));
     int num_bits = static_cast<int>(state.range(1));
     
@@ -42,7 +42,7 @@ static void BM_digits_cvps(benchmark::State& state) {
     }
 }
 
-static void BM_digits_cvpv(benchmark::State& state) {
+static void BM_cvpv_digits(benchmark::State& state) {
     size_t poly_modulus_degree = static_cast<size_t>(state.range(0));
     int num_bits = static_cast<int>(state.range(1));
     
@@ -84,7 +84,7 @@ static void BM_digits_cvpv(benchmark::State& state) {
     }
 }
 
-static void BM_digits_pvcm(benchmark::State& state) {
+static void BM_pvcm_digits(benchmark::State& state) {
     size_t poly_modulus_degree = static_cast<size_t>(state.range(0));
     int num_bits = static_cast<int>(state.range(1));
     
@@ -129,7 +129,7 @@ static void BM_digits_pvcm(benchmark::State& state) {
     }
 }
 
-static void BM_digits_pmcm(benchmark::State& state) {
+static void BM_pmcm_digits(benchmark::State& state) {
     size_t poly_modulus_degree = static_cast<size_t>(state.range(0));
     int num_bits = static_cast<int>(state.range(1));
     
@@ -178,28 +178,28 @@ static void BM_digits_pmcm(benchmark::State& state) {
     }
 }
 
-BENCHMARK(BM_digits_cvps)
+BENCHMARK(BM_cvps_digits)
     ->Args({1024, 8})
     ->Args({2048, 8})
     ->Args({4096, 8})
     ->Args({8192, 8})
     ->Unit(benchmark::kMillisecond);
 
-BENCHMARK(BM_digits_cvpv)
+BENCHMARK(BM_cvpv_digits)
     ->Args({1024, 8})
     ->Args({2048, 8})
     ->Args({4096, 8})
     ->Args({8192, 8})
     ->Unit(benchmark::kMillisecond);
 
-BENCHMARK(BM_digits_pvcm)
+BENCHMARK(BM_pvcm_digits)
     ->Args({1024, 8})
     ->Args({2048, 8})
     ->Args({4096, 8})
     ->Args({8192, 8})
     ->Unit(benchmark::kMillisecond);
 
-BENCHMARK(BM_digits_pmcm)
+BENCHMARK(BM_pmcm_digits)
     ->Args({1024, 8})
     ->Args({2048, 8})
     ->Args({4096, 8})

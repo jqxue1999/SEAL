@@ -8,7 +8,9 @@ project(SEALExamples VERSION 4.1.2 LANGUAGES CXX)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Find BLAS library
+set(BLA_STATIC ON)
 find_package(BLAS REQUIRED)
+set(OPENBLAS_STATIC_LIB /usr/lib/x86_64-linux-gnu/libopenblas.a)
 find_package(OpenMP REQUIRED)
 
 # Enable AVX2 optimization
@@ -90,7 +92,7 @@ if(SEAL_BUILD_EXAMPLES)
             ${CMAKE_CURRENT_LIST_DIR}/plain_blas_bench.cpp
             ${CMAKE_CURRENT_LIST_DIR}/plain_blas.cpp
     )
-    target_link_libraries(plain_blas_bench PRIVATE benchmark::benchmark pthread OpenMP::OpenMP_CXX BLAS::BLAS)
+    target_link_libraries(plain_blas_bench PRIVATE benchmark::benchmark pthread OpenMP::OpenMP_CXX ${OPENBLAS_STATIC_LIB})
 
     # Benchmark for plain_omp.cpp
     add_executable(plain_omp_bench)
@@ -120,14 +122,7 @@ if(SEAL_BUILD_EXAMPLES)
         message(FATAL_ERROR "Cannot find target SEAL::seal or SEAL::seal_shared")
     endif()
 
-    if(BLAS_FOUND)
-        target_link_libraries(coefficients_seal_bench PRIVATE ${BLAS_LIBRARIES})
-        if (BLAS_INCLUDE_DIRS)
-            target_include_directories(coefficients_seal_bench PRIVATE ${BLAS_INCLUDE_DIRS})
-        endif()
-    endif()
-    
-    # Link nlohmann/json library
+    target_link_libraries(coefficients_seal_bench PRIVATE ${OPENBLAS_STATIC_LIB})
     target_link_libraries(coefficients_seal_bench PRIVATE nlohmann_json::nlohmann_json)
     target_link_libraries(coefficients_seal_bench PRIVATE OpenMP::OpenMP_CXX)
     target_link_libraries(coefficients_seal_bench PRIVATE benchmark::benchmark pthread)
@@ -151,14 +146,7 @@ if(SEAL_BUILD_EXAMPLES)
         message(FATAL_ERROR "Cannot find target SEAL::seal or SEAL::seal_shared")
     endif()
 
-    if(BLAS_FOUND)
-        target_link_libraries(coefficients_blas_bench PRIVATE ${BLAS_LIBRARIES})
-        if (BLAS_INCLUDE_DIRS)
-            target_include_directories(coefficients_blas_bench PRIVATE ${BLAS_INCLUDE_DIRS})
-        endif()
-    endif()
-    
-    # Link nlohmann/json library
+    target_link_libraries(coefficients_blas_bench PRIVATE ${OPENBLAS_STATIC_LIB})
     target_link_libraries(coefficients_blas_bench PRIVATE nlohmann_json::nlohmann_json)
     target_link_libraries(coefficients_blas_bench PRIVATE OpenMP::OpenMP_CXX)
     target_link_libraries(coefficients_blas_bench PRIVATE benchmark::benchmark pthread)
@@ -181,14 +169,7 @@ if(SEAL_BUILD_EXAMPLES)
         message(FATAL_ERROR "Cannot find target SEAL::seal or SEAL::seal_shared")
     endif()
 
-    if(BLAS_FOUND)
-        target_link_libraries(digits_bench PRIVATE ${BLAS_LIBRARIES})
-        if (BLAS_INCLUDE_DIRS)
-            target_include_directories(digits_bench PRIVATE ${BLAS_INCLUDE_DIRS})
-        endif()
-    endif()
-    
-    # Link nlohmann/json library
+    target_link_libraries(digits_bench PRIVATE ${OPENBLAS_STATIC_LIB})
     target_link_libraries(digits_bench PRIVATE nlohmann_json::nlohmann_json)
     target_link_libraries(digits_bench PRIVATE OpenMP::OpenMP_CXX)
     target_link_libraries(digits_bench PRIVATE benchmark::benchmark pthread)
@@ -210,18 +191,31 @@ if(SEAL_BUILD_EXAMPLES)
         message(FATAL_ERROR "Cannot find target SEAL::seal or SEAL::seal_shared")
     endif()
 
-    if(BLAS_FOUND)
-        target_link_libraries(baseline_bench PRIVATE ${BLAS_LIBRARIES})
-        if (BLAS_INCLUDE_DIRS)
-            target_include_directories(baseline_bench PRIVATE ${BLAS_INCLUDE_DIRS})
-        endif()
-    endif()
-    
-    # Link nlohmann/json library
+    target_link_libraries(baseline_bench PRIVATE ${OPENBLAS_STATIC_LIB})
     target_link_libraries(baseline_bench PRIVATE nlohmann_json::nlohmann_json)
     target_link_libraries(baseline_bench PRIVATE OpenMP::OpenMP_CXX)
     target_link_libraries(baseline_bench PRIVATE benchmark::benchmark pthread)
 
+    # Benchmark for tee.cpp
+    add_executable(tee_bench)
+    target_sources(tee_bench
+        PRIVATE
+            ${CMAKE_CURRENT_LIST_DIR}/tee.cpp
+            ${CMAKE_CURRENT_LIST_DIR}/cpmm.cpp
+            ${CMAKE_CURRENT_LIST_DIR}/coeff_modulus_config.cpp
+    )
+
+    if(TARGET SEAL::seal)
+        target_link_libraries(tee_bench PRIVATE SEAL::seal)
+    elseif(TARGET SEAL::seal_shared)
+        target_link_libraries(tee_bench PRIVATE SEAL::seal_shared)
+    else()
+        message(FATAL_ERROR "Cannot find target SEAL::seal or SEAL::seal_shared")
+    endif()
+
+    target_link_libraries(tee_bench PRIVATE ${OPENBLAS_STATIC_LIB})
+    target_link_libraries(tee_bench PRIVATE OpenMP::OpenMP_CXX)
+    target_link_libraries(tee_bench PRIVATE benchmark::benchmark pthread)
 
 
 endif()
