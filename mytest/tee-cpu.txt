@@ -1,0 +1,45 @@
+-------------------------------------------------------------------------------
+CPU                                           Time             CPU   Iterations
+-------------------------------------------------------------------------------
+BM_encrypt_matrix_rowwise_coeff/1024       18.2 ms         15.0 ms           48
+BM_encrypt_matrix_rowwise_coeff/2048       63.2 ms         50.5 ms           14
+BM_encrypt_matrix_rowwise_coeff/4096        284 ms          221 ms            3
+BM_matrix_sub_blas/1024                    1.83 ms         1.46 ms          392
+BM_matrix_sub_blas/2048                    6.26 ms         5.36 ms          126
+BM_matrix_sub_blas/4096                    23.5 ms         23.4 ms           30
+BM_matrix_sub_omp/1024                     7.60 ms         7.53 ms           97
+BM_matrix_sub_omp/2048                     9.43 ms         8.83 ms          103
+BM_matrix_sub_omp/4096                     19.5 ms         19.4 ms           36
+BM_matrix_mul_blas/1024                    9.05 ms         9.04 ms           80
+BM_matrix_mul_blas/2048                    53.3 ms         53.3 ms           12
+BM_matrix_mul_blas/4096                     318 ms          318 ms            2
+BM_encrypted_matrix_add/1024               7.78 ms         7.76 ms          189
+BM_encrypted_matrix_add/2048               11.9 ms         9.89 ms           62
+BM_encrypted_matrix_add/4096               65.1 ms         52.3 ms           10
+BM_decrypt_matrix_rowwise_coeff/1024       9.37 ms         9.10 ms           73
+BM_decrypt_matrix_rowwise_coeff/2048       24.2 ms         18.9 ms           37
+BM_decrypt_matrix_rowwise_coeff/4096        120 ms         94.8 ms            7
+
+
+
+-------------------------------------------------------------------------------
+TEE (8 threads 16G)                           Time             CPU   Iterations
+-------------------------------------------------------------------------------
+BM_encrypt_matrix_rowwise_coeff/1024       1428 ms         1428 ms            1
+BM_encrypt_matrix_rowwise_coeff/2048        197 ms          197 ms            3
+BM_encrypt_matrix_rowwise_coeff/4096       2035 ms         2035 ms            1
+BM_matrix_sub_blas/1024                    1.32 ms         1.32 ms          529
+BM_matrix_sub_blas/2048                    6.19 ms         6.19 ms          106
+BM_matrix_sub_blas/4096                    26.5 ms         26.5 ms           26
+BM_matrix_sub_omp/1024                     1.77 ms         1.77 ms          383
+BM_matrix_sub_omp/2048                     26.8 ms         26.8 ms           25
+BM_matrix_sub_omp/4096                      135 ms          135 ms            5
+BM_matrix_mul_blas/1024                    6.33 ms         6.33 ms          101
+BM_matrix_mul_blas/2048                    45.4 ms         45.4 ms           13
+BM_matrix_mul_blas/4096                     344 ms          344 ms            2
+BM_encrypted_matrix_add/1024               2.57 ms         2.57 ms          270
+BM_encrypted_matrix_add/2048               18.4 ms         18.4 ms           36
+BM_encrypted_matrix_add/4096               1221 ms         1221 ms            1
+BM_decrypt_matrix_rowwise_coeff/1024       11.7 ms         11.7 ms           56
+BM_decrypt_matrix_rowwise_coeff/2048       53.3 ms         53.3 ms           14
+BM_decrypt_matrix_rowwise_coeff/4096        304 ms          304 ms            2
